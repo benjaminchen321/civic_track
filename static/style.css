@@ -1,0 +1,40 @@
+body {
+    font-family: sans-serif;
+    padding: 20px;
+    background-color: #f4f4f4;
+}
+
+h1, h2, h3 {
+    color: #333;
+}
+
+#senator-select {
+    padding: 8px;
+    margin-bottom: 20px;
+}
+
+#senator-info {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#donor-chart-container, #vote-list-container {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+#vote-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+#vote-list li {
+    padding: 5px 0;
+    border-bottom: 1px dotted #ccc;
+}
+ #vote-list li:last-child {
+    border-bottom: none;
+}

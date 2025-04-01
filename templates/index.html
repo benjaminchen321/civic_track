@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicTrack MVP</title>
+    <!-- We'll add CSS and JS links later -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>CivicTrack MVP</h1>
+
+    <label for="senator-select">Choose a Senator:</label>
+    <select name="senators" id="senator-select">
+        <option value="">--Please choose an option--</option>
+        {% for senator in senators %}
+            <option value="{{ senator.id }}">{{ senator.name }}</option>
+        {% endfor %}
+    </select>
+
+    <div id="senator-info" style="margin-top: 20px;">
+        <!-- Data will be loaded here by JavaScript -->
+        <h2>Senator Data</h2>
+        <div id="donor-chart-container">
+            <h3>Top Donor Industries</h3>
+            <canvas id="donorChart" width="400" height="200"></canvas>
+        </div>
+        <div id="vote-list-container" style="margin-top: 20px;">
+            <h3>Recent Votes</h3>
+            <ul id="vote-list">
+                <li>Loading...</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Our custom JavaScript -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
