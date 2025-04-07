@@ -1,23 +1,26 @@
-const senatorSelect = document.getElementById('senator-select');
-const donorChartContainer = document.getElementById('donor-chart-container');
+// Get references to HTML elements
+const memberSelect = document.getElementById('member-select'); // Updated ID
+const memberDetailsContainer = document.getElementById('member-details-content'); // New element
 const voteList = document.getElementById('vote-list');
-const donorChartElement = document.getElementById('donorChart').getContext('2d');
-let currentChart = null; // To hold the chart instance
+// REMOVED chart variables
 
-senatorSelect.addEventListener('change', (event) => {
-    const senatorId = event.target.value;
-    if (senatorId) {
-        fetchData(senatorId);
+// Event listener for the dropdown
+memberSelect.addEventListener('change', (event) => {
+    const memberId = event.target.value; // This is now the bioguideId
+    if (memberId) {
+        fetchData(memberId);
     } else {
-        // Clear data if default option selected
         clearData();
     }
 });
 
-async function fetchData(senatorId) {
-    console.log(`Fetching data for ${senatorId}...`);
+// Function to fetch data from the backend API
+async function fetchData(memberId) {
+    console.log(`Fetching data for ${memberId}...`);
+    // Update the API endpoint URL
+    const url = `/api/member/${memberId}`;
     try {
-        const response = await fetch(`/api/senator/${senatorId}`);
+        const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -26,62 +29,43 @@ async function fetchData(senatorId) {
         updateDisplay(data);
     } catch (error) {
         console.error("Could not fetch data:", error);
-        voteList.innerHTML = '<li>Error loading data.</li>';
-        if (currentChart) {
-           currentChart.destroy(); // Clear previous chart on error
-           currentChart = null;
-        }
+        memberDetailsContainer.textContent = 'Error loading details.'; // Update error display
+        voteList.innerHTML = '<li>Error loading votes.</li>';
+        // REMOVED chart clearing
     }
 }
 
+// Function to update the HTML with fetched data
 function updateDisplay(data) {
-    // Update Donor Chart
-    const labels = data.donors.map(d => d.industry);
-    const amounts = data.donors.map(d => d.amount);
-
-    if (currentChart) {
-        currentChart.destroy(); // Destroy previous chart before drawing new one
+    // Update Member Details section
+    if (data.member_details) {
+        memberDetailsContainer.textContent = `Name: ${data.member_details.name || 'N/A'} | State: ${data.member_details.state || 'N/A'} | Party: ${data.member_details.party || 'N/A'}`;
+        // Add more details as needed
+    } else {
+        memberDetailsContainer.textContent = 'Details not available.';
     }
-    currentChart = new Chart(donorChartElement, {
-        type: 'bar', // Bar chart for donors
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Contribution Amount ($)',
-                data: amounts,
-                backgroundColor: 'rgba(75, 192, 192, 0.6)', // Teal color
-                borderColor: 'rgba(75, 192, 192, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
-    });
+
+    // --- REMOVED Chart Drawing Logic ---
 
     // Update Vote List
     voteList.innerHTML = ''; // Clear previous list
-    if (data.votes.length > 0) {
+    if (data.votes && data.votes.length > 0) {
         data.votes.forEach(vote => {
             const listItem = document.createElement('li');
-            listItem.textContent = `[${vote.vote}] ${vote.description} (Bill: ${vote.bill_id})`;
+            // Adjust text content based on the fields returned by your get_member_votes function
+            listItem.textContent = `[${vote.vote || 'N/A'}] ${vote.description || 'No Description'} (Roll Call: ${vote.roll_call || 'N/A'}, Date: ${vote.vote_date || 'N/A'}, Bill: ${vote.bill_id || 'N/A'})`;
             voteList.appendChild(listItem);
         });
     } else {
-        voteList.innerHTML = '<li>No recent votes found.</li>';
+        voteList.innerHTML = '<li>No recent votes found or processed.</li>';
     }
 }
 
+// Function to clear the display
 function clearData() {
-     if (currentChart) {
-        currentChart.destroy();
-        currentChart = null;
-     }
-     voteList.innerHTML = '<li>Select a senator to view data.</li>';
+    memberDetailsContainer.textContent = 'Select a member to view details.';
+    voteList.innerHTML = '<li>Select a member to view votes.</li>';
+    // REMOVED chart clearing
 }
 
 // Initial clear state

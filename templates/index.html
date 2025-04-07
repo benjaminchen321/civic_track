@@ -3,28 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CivicTrack MVP</title>
-    <!-- We'll add CSS and JS links later -->
+    <title>CivicTrack - Legislative Activity</title> <!-- Changed Title -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>CivicTrack MVP</h1>
+    <h1>CivicTrack - Legislative Activity</h1> <!-- Changed Title -->
 
-    <label for="senator-select">Choose a Senator:</label>
-    <select name="senators" id="senator-select">
+    <label for="member-select">Choose a Member:</label>
+    <select name="members" id="member-select"> <!-- Changed ID slightly -->
         <option value="">--Please choose an option--</option>
-        {% for senator in senators %}
-            <option value="{{ senator.id }}">{{ senator.name }}</option>
+        {% for member in members %} {# Changed loop variable #}
+            {# Use bioguide_id as the value, display the name #}
+            <option value="{{ member.bioguide_id }}">{{ member.name }}</option>
         {% endfor %}
     </select>
 
-    <div id="senator-info" style="margin-top: 20px;">
+    <div id="member-info" style="margin-top: 20px;">
         <!-- Data will be loaded here by JavaScript -->
-        <h2>Senator Data</h2>
-        <div id="donor-chart-container">
-            <h3>Top Donor Industries</h3>
-            <canvas id="donorChart" width="400" height="200"></canvas>
+        <h2>Member Data</h2>
+
+        <!-- Section for Basic Details -->
+        <div id="member-details-container" style="margin-bottom: 20px;">
+             <h3>Details</h3>
+             <p id="member-details-content">Select a member to view details.</p>
         </div>
+
+        <!-- REMOVED Donor Chart Section -->
+
+        <!-- Section for Votes -->
         <div id="vote-list-container" style="margin-top: 20px;">
             <h3>Recent Votes</h3>
             <ul id="vote-list">
@@ -33,8 +39,7 @@
         </div>
     </div>
 
-    <!-- Chart.js library -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- REMOVED Chart.js library -->
     <!-- Our custom JavaScript -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
