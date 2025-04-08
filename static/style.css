@@ -1,143 +1,342 @@
+/* --- General Body & Headings --- */
 body {
-    font-family: sans-serif;
-    padding: 20px;
-    background-color: #f4f4f4;
-    line-height: 1.6; /* Improve readability */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; /* Modern font stack */
+  padding: 20px;
+  background-color: #f8f9fa; /* Lighter grey */
+  line-height: 1.6;
+  color: #333;
 }
 
-h1, h2, h3 {
-    color: #333;
-    margin-top: 1.5em; /* Add space above headings */
-    margin-bottom: 0.5em;
+h1,
+h2,
+h3,
+h4 {
+  color: #212529;
+  margin-top: 1.5em;
+  margin-bottom: 0.6em;
+  font-weight: 600; /* Slightly bolder */
 }
-h1 { margin-top: 0; }
-
-label { /* Style the label */
-    font-weight: bold;
-    margin-right: 10px;
+h1 {
+  margin-top: 0;
+  font-size: 2em;
+  text-align: center;
+  margin-bottom: 1em;
 }
-#filter-controls label { /* Less aggressive styling for radio labels */
-    font-weight: normal;
-    margin-right: 15px;
+h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #dee2e6;
+  padding-bottom: 0.3em;
+}
+h3 {
+  font-size: 1.25em;
+}
+h4 {
+  font-size: 1.1em;
+  color: #495057;
+  margin-top: 1.2em;
 }
 
+/* --- Filter Controls --- */
+#filter-controls {
+  background-color: #e9ecef;
+  padding: 15px 20px;
+  border-radius: 8px;
+  margin-bottom: 25px;
+  display: flex; /* Use flexbox for alignment */
+  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+  gap: 20px; /* Spacing between filter groups */
+  align-items: center;
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Spacing within a filter group */
+}
+.filter-group label {
+  /* Labels for radio/select */
+  font-weight: normal;
+  cursor: pointer;
+}
+.filter-label, /* Label for party group */
+#filter-controls label[for="name-search"],
+#filter-controls label[for="state-filter"] {
+  font-weight: bold;
+  margin-right: 5px;
+}
+#filter-controls input[type="text"],
+#filter-controls select {
+  padding: 8px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.95em;
+}
+#filter-controls input[type="radio"] {
+  margin-right: 3px;
+  vertical-align: middle;
+}
 
+/* --- Member Selection --- */
+#member-selection-area {
+  margin-bottom: 25px;
+}
+#member-selection-area label {
+  font-weight: bold;
+  margin-right: 10px;
+  vertical-align: middle;
+}
 #member-select {
-    padding: 8px;
-    margin-bottom: 25px; /* More space below dropdown */
-    min-width: 250px; /* Give it some width */
-    vertical-align: middle; /* Align with label */
+  padding: 10px 12px; /* Larger padding */
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  min-width: 300px;
+  font-size: 1em;
+  vertical-align: middle;
+  background-color: #fff;
 }
-#member-select-container p.error-message { /* Style error message near dropdown */
-     display: inline-block;
-     margin-left: 10px;
-     vertical-align: middle;
-     padding: 5px 8px;
-     font-size: 0.9em;
+#member-select:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+#member-select-container p.error-message {
+  display: inline-block;
+  margin-left: 10px;
+  vertical-align: middle;
+  padding: 5px 8px;
+  font-size: 0.9em;
 }
 
-
-/* Style the main info container */
+/* --- Main Info Container --- */
 #member-info {
-    background-color: #ffffff;
-    padding: 20px 25px; /* More padding */
-    border-radius: 8px; /* Softer corners */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  background-color: #ffffff;
+  padding: 0; /* Remove padding here, add to panes */
+  border-radius: 8px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #dee2e6;
+  overflow: hidden; /* Contain borders */
+}
+#member-info.hidden {
+  display: none;
 }
 
-/* Style individual sections within the info container */
-#member-info section {
-    margin-bottom: 20px; /* Space below each section */
-    padding-bottom: 15px; /* Space above the hr */
+/* --- Tab Navigation --- */
+.tab-nav {
+  display: flex;
+  background-color: #f1f3f5;
+  border-bottom: 1px solid #dee2e6;
+}
+.tab-button {
+  padding: 12px 20px;
+  cursor: pointer;
+  border: none;
+  background-color: transparent;
+  font-size: 1em;
+  font-weight: 500;
+  color: #495057;
+  border-bottom: 3px solid transparent; /* Placeholder for active border */
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  margin-bottom: -1px; /* Overlap border */
+}
+.tab-button:hover {
+  background-color: #e9ecef;
+  color: #0056b3;
+}
+.tab-button.active {
+  color: #0d6efd;
+  border-bottom: 3px solid #0d6efd;
+  background-color: #ffffff; /* Match pane background */
 }
 
-/* Style the separators */
-hr {
-    border: 0;
-    height: 1px;
-    background-color: #e0e0e0; /* Lighter separator */
-    margin: 20px 0; /* Consistent spacing around separators */
+/* --- Tab Content Panes --- */
+.tab-content {
+  padding: 20px 25px; /* Add padding here */
+}
+.tab-pane {
+  display: none; /* Hide inactive panes */
+}
+.tab-pane.active {
+  display: block; /* Show active pane */
 }
 
+/* --- Specific Tab Content Styling --- */
 
-/* Style the lists */
-#committee-list, #sponsored-bills-list, #vote-list {
-    list-style: none;
-    padding-left: 0;
-    margin-top: 5px; /* Space below heading */
+/* Details Tab */
+#details-tab {
+  display: flex; /* Use flex for photo/details layout */
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
 }
-
-#committee-list li, #sponsored-bills-list li, #vote-list li {
-    padding: 8px 5px; /* More padding */
-    border-bottom: 1px solid #eee; /* Lighter border */
-    font-size: 0.95em;
+.member-photo-container {
+  flex-basis: 150px; /* Fixed width for photo container */
+  flex-shrink: 0;
+  text-align: center;
 }
- #committee-list li:last-child,
- #sponsored-bills-list li:last-child,
- #vote-list li:last-child {
-    border-bottom: none; /* Remove border from last item */
+#member-photo {
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: block; /* Remove extra space below */
+  margin-bottom: 5px;
 }
-
-/* Style links within lists */
-#sponsored-bills-list li a {
-    font-weight: bold;
-    color: #0056b3;
-    text-decoration: none;
+#photo-loading-error {
+  font-size: 0.85em;
+  padding: 5px;
+  margin-top: 0;
 }
- #sponsored-bills-list li a:hover {
-    text-decoration: underline;
-}
-
-/* Member Details Styling */
 #member-details-content {
-    line-height: 1.8; /* More space for details */
+  flex-grow: 1; /* Allow details to take remaining space */
+  line-height: 1.8;
 }
 #member-details-content strong {
-    color: #555;
+  color: #555;
 }
 #member-details-content a {
-    color: #0056b3;
-    text-decoration: none;
-    margin-left: 5px;
+  color: #0056b3;
+  text-decoration: none;
+  margin-left: 5px;
 }
 #member-details-content a:hover {
-     text-decoration: underline;
+  text-decoration: underline;
 }
 
+/* Committees Tab */
+#committee-list,
+#subcommittee-list {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 5px;
+}
+#committee-list li,
+#subcommittee-list li {
+  padding: 8px 5px;
+  border-bottom: 1px solid #eee;
+  font-size: 0.95em;
+}
+#subcommittee-list li {
+  /* Style subcommittees */
+  padding-left: 25px; /* Indent */
+  font-size: 0.9em;
+  color: #495057;
+  border-color: #f8f9fa; /* Lighter border for sub */
+}
+#committee-list li:last-child,
+#subcommittee-list li:last-child {
+  border-bottom: none;
+}
 
-/* --- Loading Spinner and Error Styles --- */
-/* Loading Spinner */
+/* Sponsored Bills Tab */
+#sponsored-bills-list {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 5px;
+}
+#sponsored-bills-list li {
+  padding: 10px 5px;
+  border-bottom: 1px solid #eee;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+#sponsored-bills-list li:last-child {
+  border-bottom: none;
+}
+#sponsored-bills-list li a {
+  font-weight: bold;
+  color: #0056b3;
+  text-decoration: none;
+  margin-right: 5px;
+}
+#sponsored-bills-list li a:hover {
+  text-decoration: underline;
+}
+
+/* Votes Tab */
+#vote-list {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 5px;
+}
+#vote-list li {
+  padding: 10px 5px;
+  border-bottom: 1px solid #eee;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+#vote-list li:last-child {
+  border-bottom: none;
+}
+
+/* --- Loading Spinner and Error Styles (Keep as before) --- */
 .loader {
-    border: 4px solid #f3f3f3; /* Light grey */
-    border-top: 4px solid #3498db; /* Blue */
-    border-radius: 50%;
-    width: 25px;
-    height: 25px;
-    animation: spin 1s linear infinite;
-    margin: 10px auto; /* Center it slightly */
-    display: none; /* Hidden by default */
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  width: 25px;
+  height: 25px;
+  animation: spin 1s linear infinite;
+  margin: 20px auto; /* More margin */
+  display: none;
 }
-
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
-/* Class to show the loader and hide content */
 .loading .loader {
-    display: block;
+  display: block;
 }
-.loading ul { /* Hide list while loading */
-    display: none;
+.loading ul,
+.loading #member-details-content {
+  opacity: 0.3;
+} /* Fade content instead of hiding */
+.loading .member-photo-container img {
+  opacity: 0.3;
 }
 
-/* Error Message Styling */
 .error-message {
-    color: #D8000C; /* Red */
-    background-color: #FFD2D2; /* Light red background */
-    border: 1px solid #D8000C;
-    padding: 8px;
-    margin-top: 10px; /* Space above error */
-    border-radius: 3px;
-    font-weight: bold;
+  color: #d8000c;
+  background-color: #ffd2d2;
+  border: 1px solid #d8000c;
+  padding: 10px 15px;
+  margin-top: 10px;
+  border-radius: 4px;
+  font-weight: normal;
+  font-size: 0.95em;
+}
+
+/* --- Responsive Adjustments (Basic Example) --- */
+@media (max-width: 768px) {
+  #filter-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+  }
+  .filter-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  #details-tab {
+    flex-direction: column; /* Stack photo above details */
+    align-items: center;
+  }
+  .member-photo-container {
+    flex-basis: auto; /* Let photo take natural width */
+    margin-bottom: 15px;
+  }
+  h1 {
+    font-size: 1.6em;
+  }
+  .tab-nav {
+    flex-wrap: wrap;
+  } /* Allow tabs to wrap */
+  .tab-button {
+    padding: 10px 15px;
+    font-size: 0.95em;
+  }
 }

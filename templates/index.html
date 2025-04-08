@@ -1,100 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CivicTrack - Legislative Activity</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
     <h1>CivicTrack - Legislative Activity</h1>
 
     <!-- START: Filter Controls -->
-    <div id="filter-controls" style="margin-bottom: 15px;">
-        <span style="font-weight: bold; margin-right: 10px;">Filter by Party:</span>
-        <label><input type="radio" name="party-filter" value="ALL" checked> All</label>
-        <label><input type="radio" name="party-filter" value="D"> Democrat</label>
-        <label><input type="radio" name="party-filter" value="R"> Republican</label>
-        <label><input type="radio" name="party-filter" value="ID"> Independent/Other</label>
+    <div id="filter-controls">
+      <div class="filter-group">
+        <label for="name-search">Search by Name:</label>
+        <input type="text" id="name-search" placeholder="Enter name..." />
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Filter by Party:</span>
+        <label
+          ><input type="radio" name="party-filter" value="ALL" checked />
+          All</label
+        >
+        <label><input type="radio" name="party-filter" value="D" /> Dem</label>
+        <!-- Shorter Label -->
+        <label><input type="radio" name="party-filter" value="R" /> Rep</label>
+        <!-- Shorter Label -->
+        <label
+          ><input type="radio" name="party-filter" value="ID" /> Other</label
+        >
+        <!-- Shorter Label -->
+      </div>
+      <div class="filter-group">
+        <label for="state-filter">Filter by State:</label>
+        <select id="state-filter">
+          <option value="ALL">All States</option>
+          {% for state in states %}
+          <option value="{{ state }}">{{ state }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
     <!-- END: Filter Controls -->
 
-    <label for="member-select">Choose a Member:</label>
-    <!-- Member Select Dropdown - Populated by JS -->
-    <!-- Added fallback message directly within the select's container -->
-    <div id="member-select-container">
+    <div id="member-selection-area">
+      <label for="member-select">Choose a Member:</label>
+      <div id="member-select-container">
         {% if all_members_json and all_members_json != '[]' %}
-            <select name="members" id="member-select">
-               <option value="">-- Select Party Filter --</option>
-               <!-- Options will be populated by JS -->
-            </select>
+        <select name="members" id="member-select">
+          <option value="">-- Adjust Filters or Select --</option>
+          <!-- Options populated by JS -->
+        </select>
         {% else %}
-            <p style="color: red; font-weight: bold; display: inline-block; margin-left: 10px;">Could not load member list. Check application logs.</p>
-            <select name="members" id="member-select" disabled style="display: none;">
-                 <option value="">-- Member List Unavailable --</option>
-            </select>
+        <p
+          class="error-message"
+          style="display: inline-block; margin-left: 10px"
+        >
+          Could not load member list.
+        </p>
+        <select
+          name="members"
+          id="member-select"
+          disabled
+          style="display: none"
+        >
+          <option value="">-- Member List Unavailable --</option>
+        </select>
         {% endif %}
+      </div>
     </div>
 
+    <div id="member-info" class="hidden" style="margin-top: 20px">
+      <!-- START: Tab Navigation -->
+      <div class="tab-nav">
+        <button class="tab-button active" data-tab="details-tab">
+          Details
+        </button>
+        <button class="tab-button" data-tab="committees-tab">Committees</button>
+        <button class="tab-button" data-tab="bills-tab">Sponsored Bills</button>
+        <button class="tab-button" data-tab="votes-tab">Recent Votes</button>
+      </div>
+      <!-- END: Tab Navigation -->
 
-    <div id="member-info" style="margin-top: 20px;">
-        <!-- Data sections -->
-        <section id="member-details-section">
-             <h2>Member Details</h2>
-             <!-- ARIA Live region for announcements -->
-             <div id="member-status" aria-live="polite">
-                <!-- Using div for details to allow innerHTML -->
-                <div id="member-details-content">Select a member to view details.</div>
-             </div>
-        </section>
+      <!-- START: Tab Content -->
+      <div class="tab-content">
+        <!-- Details Tab -->
+        <div id="details-tab" class="tab-pane active">
+          <h2>Member Details</h2>
+          <div id="member-status" aria-live="polite">
+            <div class="member-photo-container">
+              <img
+                id="member-photo"
+                src=""
+                alt="Member Photo"
+                style="display: none"
+              />
+              <span
+                id="photo-loading-error"
+                class="error-message"
+                style="display: none"
+                >Photo not available</span
+              >
+            </div>
+            <div id="member-details-content">
+              Select a member to view details.
+            </div>
+          </div>
+        </div>
 
-        <hr> <!-- Visual separator -->
+        <!-- Committees Tab -->
+        <div id="committees-tab" class="tab-pane">
+          <h2>Committee Assignments</h2>
+          <div id="committee-status" aria-live="polite">
+            <div class="loader"></div>
+            <h4>Main Committees</h4>
+            <ul id="committee-list">
+              <li>Loading...</li>
+            </ul>
+            <h4>Subcommittees</h4>
+            <ul id="subcommittee-list">
+              <li>Loading...</li>
+            </ul>
+          </div>
+        </div>
 
-        <section id="committee-section">
-            <h2>Committee Assignments</h2>
-            <!-- ARIA Live region -->
-            <div id="committee-status" aria-live="polite">
-                <div class="loader"></div> <!-- Loader -->
-                <ul id="committee-list">
-                    <li>Select a member to view committees.</li>
-                </ul>
-             </div>
-        </section>
+        <!-- Bills Tab -->
+        <div id="bills-tab" class="tab-pane">
+          <h2>Recently Sponsored Bills</h2>
+          <div id="sponsored-bills-status" aria-live="polite">
+            <div class="loader"></div>
+            <ul id="sponsored-bills-list">
+              <li>Loading...</li>
+            </ul>
+          </div>
+        </div>
 
-        <hr> <!-- Visual separator -->
-
-         <section id="sponsored-bills-section">
-            <h2>Recently Sponsored Bills</h2>
-             <!-- ARIA Live region -->
-             <div id="sponsored-bills-status" aria-live="polite">
-                <div class="loader"></div> <!-- Loader -->
-                <ul id="sponsored-bills-list">
-                    <li>Select a member to view sponsored bills.</li>
-                </ul>
-             </div>
-        </section>
-
-        <hr> <!-- Visual separator -->
-
-        <section id="votes-section">
-            <h2>Recent Votes</h2>
-             <!-- ARIA Live region -->
-             <div id="votes-status" aria-live="polite">
-                <div class="loader"></div> <!-- Loader -->
-                <ul id="vote-list">
-                    <li>Select a member to view votes.</li>
-                </ul>
-             </div>
-        </section>
+        <!-- Votes Tab -->
+        <div id="votes-tab" class="tab-pane">
+          <h2>Recent Votes</h2>
+          <div id="votes-status" aria-live="polite">
+            <div class="loader"></div>
+            <ul id="vote-list">
+              <li>Loading...</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <!-- END: Tab Content -->
     </div>
 
     <!-- Embed full member list as JSON for JavaScript -->
-    <!-- Ensure this script tag is present and uses the |tojson filter -->
     <script>
-        const allMembersData = JSON.parse({{ all_members_json|tojson }});
+      const allMembersData = JSON.parse({{ all_members_json|tojson|safe }}); // Use safe filter
     </script>
 
     <!-- Link your main script AFTER the data is defined -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
-</body>
+  </body>
 </html>
