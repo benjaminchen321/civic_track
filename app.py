@@ -1,4 +1,5 @@
 import os
+import json  # <-- Added json import
 import requests
 from flask import Flask, jsonify, render_template
 from flask_caching import Cache
@@ -29,24 +30,23 @@ def load_congress_members():
     Returns a dictionary mapping member ID (bioguideId) to member info.
     (Cached on startup)
     """
-    print("Attempting to execute load_congress_members...")  # Log start of attempt
+    print("Attempting to execute load_congress_members...")
     members_data = {}
     if not CONGRESS_GOV_API_KEY:
         print(
             "CRITICAL WARNING: Congress.gov API Key not set. Cannot load member list."
         )
-        return members_data  # Return empty if no key
+        return members_data
 
     limit = 250
+    # Ensure you are using the correct endpoint and parameters for your API version
     url = f"https://api.congress.gov/v3/member?limit={limit}&api_key={CONGRESS_GOV_API_KEY}"
     print(f"Fetching member list from Congress.gov: {url}")
 
     try:
-        print(
-            "Executing load_congress_members API call (Cache miss or expired)"
-        )  # Log actual execution
+        print("Executing load_congress_members API call (Cache miss or expired)")
         response = requests.get(url)
-        response.raise_for_status()  # Check for HTTP errors (4xx, 5xx)
+        response.raise_for_status()
         data = response.json()
 
         if "members" in data:
@@ -55,12 +55,18 @@ def load_congress_members():
             for member in members:
                 bioguide_id = member.get("bioguideId")
                 if bioguide_id:
+                    # Capture website URL if available (check actual field name in API response)
+                    website_url = member.get(
+                        "directUrl"
+                    )  # Assumes 'directUrl' field name
+
                     members_data[bioguide_id] = {
-                        "name": member.get("name", "Unknown Name"),  # Provide default
+                        "name": member.get("name", "Unknown Name"),
                         "bioguide_id": bioguide_id,
                         "state": member.get("state"),
                         "party": member.get("partyName"),
                         "terms": member.get("terms"),
+                        "website_url": website_url,  # <-- Added website URL
                     }
         else:
             print(
@@ -69,7 +75,7 @@ def load_congress_members():
 
     except requests.exceptions.RequestException as e:
         print(f"CRITICAL ERROR fetching Congress.gov member list: {e}")
-    except Exception as e:  # Catch other potential errors like JSONDecodeError
+    except Exception as e:
         print(f"CRITICAL ERROR processing member list: {e}")
 
     if not members_data:
@@ -78,10 +84,13 @@ def load_congress_members():
     return members_data
 
 
-@cache.memoize(timeout=3600)  # Cache committee data per member for 1 hour
+# --- Functions get_member_committees, get_sponsored_bills, get_member_votes ---
+# These function definitions remain unchanged from the previous version where they were added
+# Ensure they are still present here.
+# Example placeholder for brevity:
+@cache.memoize(timeout=3600)
 def get_member_committees(bioguide_id):
-    """Fetches committee assignments for a member."""
-    # ... (function content remains the same as previous version) ...
+    # ... (Full function code from previous step) ...
     committees = []
     if not CONGRESS_GOV_API_KEY:
         print("Error: Congress.gov API Key not set for committees.")
@@ -112,10 +121,9 @@ def get_member_committees(bioguide_id):
     return committees
 
 
-@cache.memoize(timeout=1800)  # Cache sponsored bills per member for 30 mins
+@cache.memoize(timeout=1800)
 def get_sponsored_bills(bioguide_id):
-    """Fetches recent bills sponsored by a member."""
-    # ... (function content remains the same as previous version) ...
+    # ... (Full function code from previous step) ...
     bills = []
     if not CONGRESS_GOV_API_KEY:
         print("Error: Congress.gov API Key not set for bills.")
@@ -153,18 +161,15 @@ def get_sponsored_bills(bioguide_id):
     return bills
 
 
-# Note: get_member_votes might need significant debugging based on API structure
-# We are keeping the previous version here for completeness
 def get_member_votes(bioguide_id):
-    """Fetches recent votes for a member using their bioguideId."""
-    # ... (function content remains the same as previous version) ...
+    # ... (Full function code from previous step, including potential need for debugging/refining based on API response) ...
     if not CONGRESS_GOV_API_KEY:
         print("Error: Congress.gov API Key not set for votes.")
         return []
     limit = 10
-    chamber = "senate"  # Might need adjustment based on member's chamber
-    congress = "118"  # Might need adjustment
-    session = "1"  # Might need adjustment
+    chamber = "senate"
+    congress = "118"
+    session = "1"
     url = f"https://api.congress.gov/v3/recorded-vote/{chamber}?congress={congress}&sessionNumber={session}&limit={limit}&api_key={CONGRESS_GOV_API_KEY}"
     print(f"Attempting to fetch recent votes: {url}")
     member_votes_processed = []
@@ -178,8 +183,7 @@ def get_member_votes(bioguide_id):
             )
             for vote in vote_data["votes"]:
                 member_position = "Not Recorded"
-                # Hypothetical structure check - needs validation against actual API response
-                members_section = vote.get("members")  # Example path
+                members_section = vote.get("members")
                 if (
                     members_section
                     and isinstance(members_section, dict)
@@ -195,8 +199,6 @@ def get_member_votes(bioguide_id):
                                     "votePosition", "Unknown"
                                 )
                                 break
-                # More robust check needed ^^^ based on actual data
-
                 vote_info = vote.get("voteInformation", {})
                 bill_info = vote.get("bill", {})
                 member_votes_processed.append(
@@ -226,7 +228,6 @@ def get_member_votes(bioguide_id):
 
 
 # --- Load Member Data ONCE on startup ---
-# Critical: This call populates the data used by the index route
 MEMBERS_DATA = load_congress_members()
 if not MEMBERS_DATA:
     print(
@@ -242,25 +243,24 @@ else:
 def index():
     """Serves the main HTML page."""
     print("Serving index page...")
-    # Convert dictionary values to a list for the template
-    # Sort alphabetically by name for the dropdown
-    # Ensure MEMBERS_DATA is accessed correctly
-    try:
-        member_list = (
-            sorted(
-                list(MEMBERS_DATA.values()),
-                key=lambda m: m.get("name", "ZZZ"),  # Sort unnamed last
-            )
-            if MEMBERS_DATA
-            else []
-        )  # Handle case where MEMBERS_DATA is empty
-        print(f"Passing {len(member_list)} members to template.")
-    except Exception as e:
-        print(f"Error processing MEMBERS_DATA for index route: {e}")
-        member_list = []  # Pass empty list on error
+    all_members_dict = MEMBERS_DATA if MEMBERS_DATA else {}
 
-    # Ensure the variable name 'members' matches the template {% for member in members %}
-    return render_template("index.html", members=member_list)
+    # Convert dictionary values to a list of member objects for JSON serialization
+    all_members_list = list(all_members_dict.values())
+
+    # Use json.dumps for safe JSON serialization for embedding in HTML
+    try:
+        all_members_json_string = json.dumps(all_members_list)
+        print(f"Passing {len(all_members_list)} members as JSON to template.")
+    except TypeError as e:
+        print(f"Error serializing member data to JSON: {e}")
+        all_members_json_string = "[]"  # Pass empty list as fallback
+
+    return render_template(
+        "index.html",
+        # We are not looping in the template anymore, JS handles population
+        all_members_json=all_members_json_string,  # Pass JSON string
+    )
 
 
 @app.route("/api/member/<bioguide_id>")
@@ -274,7 +274,6 @@ def get_member_data(bioguide_id):
         return jsonify({"error": "Member info not found"}), 404
 
     # Fetch data using helper functions
-    # Note: These calls might be slow if not cached
     committee_data = get_member_committees(bioguide_id)
     sponsored_bills_data = get_sponsored_bills(bioguide_id)
     vote_data = get_member_votes(bioguide_id)
@@ -284,6 +283,7 @@ def get_member_data(bioguide_id):
             "name": member_info.get("name"),
             "state": member_info.get("state"),
             "party": member_info.get("party"),
+            "website_url": member_info.get("website_url"),  # <-- Include website URL
         },
         "votes": vote_data,
         "committees": committee_data,
@@ -294,7 +294,5 @@ def get_member_data(bioguide_id):
 
 # --- End Flask Routes ---
 
-
 if __name__ == "__main__":
-    # Set debug=False if deploying to production via gunicorn later
     app.run(debug=True)

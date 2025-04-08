@@ -9,24 +9,32 @@
 <body>
     <h1>CivicTrack - Legislative Activity</h1>
 
+    <!-- START: Filter Controls -->
+    <div id="filter-controls" style="margin-bottom: 15px;">
+        <span style="font-weight: bold; margin-right: 10px;">Filter by Party:</span>
+        <label><input type="radio" name="party-filter" value="ALL" checked> All</label>
+        <label><input type="radio" name="party-filter" value="D"> Democrat</label>
+        <label><input type="radio" name="party-filter" value="R"> Republican</label>
+        <label><input type="radio" name="party-filter" value="ID"> Independent/Other</label>
+    </div>
+    <!-- END: Filter Controls -->
+
     <label for="member-select">Choose a Member:</label>
-    <!-- Check if the 'members' list passed from Flask has items -->
-    {% if members %}
-        <select name="members" id="member-select">
-            <option value="">--Please choose an option--</option>
-            <!-- Loop through the 'members' list -->
-            {% for member in members %}
-                <!-- Ensure 'member.bioguide_id' and 'member.name' exist -->
-                <option value="{{ member.bioguide_id }}">{{ member.name }}</option>
-            {% endfor %}
-        </select>
-    {% else %}
-        <!-- Display message if no members were loaded -->
-        <p style="color: red; font-weight: bold;">Could not load member list. Please check application logs.</p>
-        <select name="members" id="member-select" disabled>
-             <option value="">-- Member List Unavailable --</option>
-        </select>
-    {% endif %}
+    <!-- Member Select Dropdown - Populated by JS -->
+    <!-- Added fallback message directly within the select's container -->
+    <div id="member-select-container">
+        {% if all_members_json and all_members_json != '[]' %}
+            <select name="members" id="member-select">
+               <option value="">-- Select Party Filter --</option>
+               <!-- Options will be populated by JS -->
+            </select>
+        {% else %}
+            <p style="color: red; font-weight: bold; display: inline-block; margin-left: 10px;">Could not load member list. Check application logs.</p>
+            <select name="members" id="member-select" disabled style="display: none;">
+                 <option value="">-- Member List Unavailable --</option>
+            </select>
+        {% endif %}
+    </div>
 
 
     <div id="member-info" style="margin-top: 20px;">
@@ -35,7 +43,8 @@
              <h2>Member Details</h2>
              <!-- ARIA Live region for announcements -->
              <div id="member-status" aria-live="polite">
-                <p id="member-details-content">Select a member to view details.</p>
+                <!-- Using div for details to allow innerHTML -->
+                <div id="member-details-content">Select a member to view details.</div>
              </div>
         </section>
 
@@ -79,6 +88,13 @@
         </section>
     </div>
 
+    <!-- Embed full member list as JSON for JavaScript -->
+    <!-- Ensure this script tag is present and uses the |tojson filter -->
+    <script>
+        const allMembersData = JSON.parse({{ all_members_json|tojson }});
+    </script>
+
+    <!-- Link your main script AFTER the data is defined -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

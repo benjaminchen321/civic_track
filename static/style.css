@@ -16,12 +16,26 @@ label { /* Style the label */
     font-weight: bold;
     margin-right: 10px;
 }
+#filter-controls label { /* Less aggressive styling for radio labels */
+    font-weight: normal;
+    margin-right: 15px;
+}
 
-#member-select { /* Renamed from #senator-select if you followed that suggestion */
+
+#member-select {
     padding: 8px;
     margin-bottom: 25px; /* More space below dropdown */
     min-width: 250px; /* Give it some width */
+    vertical-align: middle; /* Align with label */
 }
+#member-select-container p.error-message { /* Style error message near dropdown */
+     display: inline-block;
+     margin-left: 10px;
+     vertical-align: middle;
+     padding: 5px 8px;
+     font-size: 0.9em;
+}
+
 
 /* Style the main info container */
 #member-info {
@@ -73,6 +87,23 @@ hr {
  #sponsored-bills-list li a:hover {
     text-decoration: underline;
 }
+
+/* Member Details Styling */
+#member-details-content {
+    line-height: 1.8; /* More space for details */
+}
+#member-details-content strong {
+    color: #555;
+}
+#member-details-content a {
+    color: #0056b3;
+    text-decoration: none;
+    margin-left: 5px;
+}
+#member-details-content a:hover {
+     text-decoration: underline;
+}
+
 
 /* --- Loading Spinner and Error Styles --- */
 /* Loading Spinner */
