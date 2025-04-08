@@ -3,44 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CivicTrack - Legislative Activity</title> <!-- Changed Title -->
+    <title>CivicTrack - Legislative Activity</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>CivicTrack - Legislative Activity</h1> <!-- Changed Title -->
+    <h1>CivicTrack - Legislative Activity</h1>
 
     <label for="member-select">Choose a Member:</label>
-    <select name="members" id="member-select"> <!-- Changed ID slightly -->
+    <select name="members" id="member-select">
         <option value="">--Please choose an option--</option>
-        {% for member in members %} {# Changed loop variable #}
-            {# Use bioguide_id as the value, display the name #}
+        {% for member in members %}
             <option value="{{ member.bioguide_id }}">{{ member.name }}</option>
         {% endfor %}
     </select>
 
     <div id="member-info" style="margin-top: 20px;">
-        <!-- Data will be loaded here by JavaScript -->
-        <h2>Member Data</h2>
-
-        <!-- Section for Basic Details -->
-        <div id="member-details-container" style="margin-bottom: 20px;">
-             <h3>Details</h3>
+        <!-- Data sections -->
+        <section id="member-details-section">
+             <h2>Member Details</h2>
              <p id="member-details-content">Select a member to view details.</p>
-        </div>
+        </section>
 
-        <!-- REMOVED Donor Chart Section -->
+        <hr> <!-- Visual separator -->
 
-        <!-- Section for Votes -->
-        <div id="vote-list-container" style="margin-top: 20px;">
-            <h3>Recent Votes</h3>
+        <section id="committee-section">
+            <h2>Committee Assignments</h2>
+            <ul id="committee-list">
+                <li>Loading...</li>
+            </ul>
+        </section>
+
+        <hr> <!-- Visual separator -->
+
+         <section id="sponsored-bills-section">
+            <h2>Recently Sponsored Bills</h2>
+            <ul id="sponsored-bills-list">
+                <li>Loading...</li>
+            </ul>
+        </section>
+
+        <hr> <!-- Visual separator -->
+
+        <section id="votes-section">
+            <h2>Recent Votes</h2>
             <ul id="vote-list">
                 <li>Loading...</li>
             </ul>
-        </div>
+        </section>
     </div>
 
-    <!-- REMOVED Chart.js library -->
-    <!-- Our custom JavaScript -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

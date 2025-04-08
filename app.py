@@ -2,17 +2,31 @@ import os
 
 import requests
 from flask import Flask, jsonify, render_template
+from flask_caching import Cache
 
 app = Flask(__name__)
+
+# --- Cache Configuration ---
+# Simple filesystem cache stored in a 'flask_cache' directory
+cache_config = {
+    "CACHE_TYPE": "FileSystemCache",
+    "CACHE_DIR": "flask_cache",
+    "CACHE_DEFAULT_TIMEOUT": 3600  # Default cache time: 1 hour (in seconds)
+}
+app.config.from_mapping(cache_config)
+cache = Cache(app)
+# --- End Cache Configuration ---
 
 # Load API Keys from environment variables
 CONGRESS_GOV_API_KEY = os.environ.get('CONGRESS_GOV_API_KEY')
 
 
+@cache.memoize(timeout=43200)  # Cache member list for 12 hours
 def load_congress_members():
     """
     Fetches a list of current Senators from the Congress.gov API /member endpoint.
     Returns a dictionary mapping member ID (bioguideId) to member info.
+    (Cached on startup)
     """
     members_data = {}
     if not CONGRESS_GOV_API_KEY:
@@ -28,6 +42,7 @@ def load_congress_members():
     print(f"Attempting to fetch member list from Congress.gov: {url}")
 
     try:
+        print("Executing load_congress_members (Cache miss or expired)")
         response = requests.get(url)
         response.raise_for_status()  # Check for HTTP errors
         data = response.json()
@@ -66,6 +81,86 @@ def load_congress_members():
     # For simplicity now, we load all members returned by the basic call.
 
     return members_data
+
+
+@cache.memoize(timeout=3600)  # Cache committee data per member for 1 hour
+def get_member_committees(bioguide_id):
+    """Fetches committee assignments for a member."""
+    committees = []
+    if not CONGRESS_GOV_API_KEY:
+        print("Error: Congress.gov API Key not set for committees.")
+        return committees
+
+    # Placeholder URL structure - verify with docs!
+    url = f"https://api.congress.gov/v3/member/{bioguide_id}/committee-assignments?api_key={CONGRESS_GOV_API_KEY}"
+    print(f"Fetching committee assignments for {bioguide_id} from {url}")
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+
+        # Parse the response - structure depends heavily on API!
+        # Assuming a structure like {'committeeAssignments': [{'committee': {'name': ...}}]}
+        if 'committeeAssignments' in data:
+            print(f"Received {len(data['committeeAssignments'])} committee assignments.")
+            for assignment in data['committeeAssignments']:
+                committee_info = assignment.get('committee', {})
+                committees.append({
+                    "name": committee_info.get('name', 'Unknown Committee'),
+                    # Add other details like chamber, code if needed/available
+                })
+        else:
+            print("No 'committeeAssignments' key found in response.")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching committees: {e}")
+    except Exception as e:
+        print(f"Unexpected error processing committees: {e}")
+
+    return committees
+
+
+@cache.memoize(timeout=1800)  # Cache sponsored bills per member for 30 mins
+def get_sponsored_bills(bioguide_id):
+    """Fetches recent bills sponsored by a member."""
+    bills = []
+    if not CONGRESS_GOV_API_KEY:
+        print("Error: Congress.gov API Key not set for bills.")
+        return bills
+
+    limit = 5  # Get latest 5 sponsored bills
+    # Check docs for sorting options (e.g., by date introduced)
+    # Example URL assuming /v3/bill endpoint with sponsor filter
+    url = f"https://api.congress.gov/v3/bill?sponsorBioguideId={bioguide_id}&sort=updateDate+desc&limit={limit}&api_key={CONGRESS_GOV_API_KEY}"
+    print(f"Fetching sponsored bills for {bioguide_id} from {url}")
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+
+        # Parse response - structure depends on API! Assuming {'bills': [...]}
+        if 'bills' in data:
+            print(f"Received {len(data['bills'])} sponsored bills.")
+            for bill in data['bills']:
+                bills.append({
+                    "number": bill.get('number'),
+                    "type": bill.get('type'),
+                    "title": bill.get('title'),
+                    "latest_action_text": bill.get('latestAction', {}).get('text'),
+                    "latest_action_date": bill.get('latestAction', {}).get('actionDate'),
+                    "congress": bill.get('congress')  # Needed for linking
+                })
+        else:
+            print("No 'bills' key found in sponsored bills response.")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching sponsored bills: {e}")
+    except Exception as e:
+        print(f"Unexpected error processing sponsored bills: {e}")
+
+    return bills
 
 
 def get_member_votes(bioguide_id):
@@ -171,6 +266,10 @@ def get_member_data(bioguide_id):
 
     # Fetch vote data using the helper function
     vote_data = get_member_votes(bioguide_id)
+    committee_data = get_member_committees(bioguide_id)
+    sponsored_bills_data = get_sponsored_bills(bioguide_id)
+
+    print(f"member_info: {member_info}")
 
     # --- REMOVED DONOR DATA ---
 
@@ -183,7 +282,9 @@ def get_member_data(bioguide_id):
             "party": member_info.get('party'),
             # Add any other details from MEMBERS_DATA you want to show
         },
-        "votes": vote_data
+        "votes": vote_data,
+        "committees": committee_data,
+        "sponsored_bills": sponsored_bills_data
     }
 
     return jsonify(combined_data)
