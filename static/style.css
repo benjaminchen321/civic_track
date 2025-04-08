@@ -2,39 +2,111 @@ body {
     font-family: sans-serif;
     padding: 20px;
     background-color: #f4f4f4;
+    line-height: 1.6; /* Improve readability */
 }
 
 h1, h2, h3 {
     color: #333;
+    margin-top: 1.5em; /* Add space above headings */
+    margin-bottom: 0.5em;
+}
+h1 { margin-top: 0; }
+
+label { /* Style the label */
+    font-weight: bold;
+    margin-right: 10px;
 }
 
-#senator-select {
+#member-select { /* Renamed from #senator-select if you followed that suggestion */
     padding: 8px;
-    margin-bottom: 20px;
+    margin-bottom: 25px; /* More space below dropdown */
+    min-width: 250px; /* Give it some width */
 }
 
-#senator-info {
-    background-color: #fff;
-    padding: 15px;
-    border-radius: 5px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+/* Style the main info container */
+#member-info {
+    background-color: #ffffff;
+    padding: 20px 25px; /* More padding */
+    border-radius: 8px; /* Softer corners */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-#donor-chart-container, #vote-list-container {
-    margin-top: 15px;
-    padding-top: 10px;
-    border-top: 1px solid #eee;
+/* Style individual sections within the info container */
+#member-info section {
+    margin-bottom: 20px; /* Space below each section */
+    padding-bottom: 15px; /* Space above the hr */
 }
 
-#vote-list {
+/* Style the separators */
+hr {
+    border: 0;
+    height: 1px;
+    background-color: #e0e0e0; /* Lighter separator */
+    margin: 20px 0; /* Consistent spacing around separators */
+}
+
+
+/* Style the lists */
+#committee-list, #sponsored-bills-list, #vote-list {
     list-style: none;
     padding-left: 0;
+    margin-top: 5px; /* Space below heading */
 }
 
-#vote-list li {
-    padding: 5px 0;
-    border-bottom: 1px dotted #ccc;
+#committee-list li, #sponsored-bills-list li, #vote-list li {
+    padding: 8px 5px; /* More padding */
+    border-bottom: 1px solid #eee; /* Lighter border */
+    font-size: 0.95em;
 }
+ #committee-list li:last-child,
+ #sponsored-bills-list li:last-child,
  #vote-list li:last-child {
-    border-bottom: none;
+    border-bottom: none; /* Remove border from last item */
+}
+
+/* Style links within lists */
+#sponsored-bills-list li a {
+    font-weight: bold;
+    color: #0056b3;
+    text-decoration: none;
+}
+ #sponsored-bills-list li a:hover {
+    text-decoration: underline;
+}
+
+/* --- Loading Spinner and Error Styles --- */
+/* Loading Spinner */
+.loader {
+    border: 4px solid #f3f3f3; /* Light grey */
+    border-top: 4px solid #3498db; /* Blue */
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    animation: spin 1s linear infinite;
+    margin: 10px auto; /* Center it slightly */
+    display: none; /* Hidden by default */
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Class to show the loader and hide content */
+.loading .loader {
+    display: block;
+}
+.loading ul { /* Hide list while loading */
+    display: none;
+}
+
+/* Error Message Styling */
+.error-message {
+    color: #D8000C; /* Red */
+    background-color: #FFD2D2; /* Light red background */
+    border: 1px solid #D8000C;
+    padding: 8px;
+    margin-top: 10px; /* Space above error */
+    border-radius: 3px;
+    font-weight: bold;
 }
