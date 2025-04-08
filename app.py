@@ -23,7 +23,7 @@ CONGRESS_GOV_API_KEY = os.environ.get("CONGRESS_GOV_API_KEY")
 # --- Helper Functions ---
 
 
-# @cache.memoize(timeout=43200)  # Cache member list for 12 hours
+@cache.memoize(timeout=43200)  # Cache member list for 12 hours
 def load_congress_members():
     """
     Fetches initial Member list for dropdown population.
@@ -56,11 +56,14 @@ def load_congress_members():
                 if bioguide_id:
                     # Attempt to get standard party code (D, R, ID)
                     party_name = member.get("partyName", "")
-                    party_code = "ID"  # Default to Independent/Other
-                    if party_name.lower() == "democrat":
+                    print(f"party_name: {party_name}")
+                    party_code = None
+                    if party_name == "Democratic":
                         party_code = "D"
-                    elif party_name.lower() == "republican":
+                    elif party_name == "Republican":
                         party_code = "R"
+                    elif party_name == "Independent":
+                        party_code = "ID"
 
                     members_data[bioguide_id] = {
                         "name": member.get("name", "Unknown Name"),  # Provide default
@@ -88,7 +91,7 @@ def load_congress_members():
     return members_data
 
 
-# @cache.memoize(timeout=3600)
+@cache.memoize(timeout=3600)
 def get_member_details(bioguide_id):
     """Fetches detailed info. Returns {"details": {...}, "error": None}"""
     # Note: Removed committee parsing from here as it wasn't reliable in this endpoint
@@ -141,7 +144,7 @@ def get_member_details(bioguide_id):
     return member_payload
 
 
-# @cache.memoize(timeout=1800)
+@cache.memoize(timeout=1800)
 def get_sponsored_legislation(bioguide_id):
     """
     Fetches recent sponsored legislation (bills OR amendments) and returns
