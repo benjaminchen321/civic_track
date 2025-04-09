@@ -3,33 +3,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Get references ---
   const memberSelect = document.getElementById("member-select");
-  const memberListLoader = document.getElementById("member-list-loader"); // Loader for member list
-  const memberListError = document.getElementById("member-list-error"); // Error for member list
-  // Filters
-  const congressFilterSelect = document.getElementById("congress-filter"); // <-- New Filter
+  const memberListLoader = document.getElementById("member-list-loader");
+  const memberListError = document.getElementById("member-list-error");
+  const congressFilterSelect = document.getElementById("congress-filter");
   const nameSearchInput = document.getElementById("name-search");
   const partyFilters = document.querySelectorAll('input[name="party-filter"]');
   const chamberFilters = document.querySelectorAll(
     'input[name="chamber-filter"]'
   );
   const stateFilterSelect = document.getElementById("state-filter");
-  // Main container
   const memberInfoDiv = document.getElementById("member-info");
-  // Tabs
   const tabButtons = document.querySelectorAll(".tab-button");
   const tabPanes = document.querySelectorAll(".tab-pane");
-  // Details Tab
   const memberPhoto = document.getElementById("member-photo");
   const photoLoadingError = document.getElementById("photo-loading-error");
   const memberDetailsContainer = document.getElementById(
     "member-details-content"
   );
-  // Sponsored Tab
   const sponsoredItemsList = document.getElementById("sponsored-items-list");
   const sponsoredItemsStatus = document.getElementById(
     "sponsored-items-status"
   );
-  // Cosponsored Tab
   const cosponsoredItemsList = document.getElementById(
     "cosponsored-items-list"
   );
@@ -39,97 +33,102 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Global Variables & Constants ---
   let currentFilters = {
-    congress: initialCongress || null, // Use initialCongress from HTML
+    congress: initialCongress || null,
     name: "",
     party: "ALL",
     state: "ALL",
     chamber: "ALL",
   };
-  // Moved from HTML - JS now holds the member data for the selected congress
-  let allMembersData = []; // This will hold data for the *selected* congress
+  let allMembersData = [];
 
-  // Mapping from API Bill Type codes to congress.gov URL path segments
+  // --- START: Updated billTypePaths with Amendment types ---
   const billTypePaths = {
+    // Bills
     HR: "house-bill",
     S: "senate-bill",
+    // Resolutions
     HRES: "house-resolution",
     SRES: "senate-resolution",
     HJRES: "house-joint-resolution",
     SJRES: "senate-joint-resolution",
     HCONRES: "house-concurrent-resolution",
     SCONRES: "senate-concurrent-resolution",
-    // Add Amendment types if needed - check congress.gov URL structure
-    HAMDT: "house-amendment", // Example - Verify!
-    SAMDT: "senate-amendment", // Example - Verify!
+    // Amendments (Verify paths on congress.gov if possible)
+    SAMDT: "senate-amendment", // Official Senate Amendment
+    HAMDT: "house-amendment", // Official House Amendment
+    SA: "senate-amendment", // Simple Senate Amendment (might map to same place)
+    HA: "house-amendment", // Simple House Amendment (might map to same place)
+    // Add others like SCONRESAMDT if needed
   };
+  // --- END: Updated billTypePaths ---
 
   // --- Helper functions ---
-
   function createLegislationListItem(item) {
-    // Helper to create list items for both sponsored and cosponsored tabs
     const listItem = document.createElement("li");
-    let itemDisplayNum = "N/A";
-    let itemElement = document.createElement("span"); // Default to span
-    itemElement.textContent = "N/A"; // Default text
-
+    let itemElement = document.createElement("span");
+    itemElement.textContent = "N/A";
     const itemTitle = item.title || "No Title Available";
     const congressNum = item.congress;
-    const itemType = item.type; // e.g., "HR", "S", "HAMDT"
-    const itemNum = item.number; // Bill number or Amendment number
+    const itemTypeCode = item.type; // Use the actual type code from backend (e.g., S, HR, SAMDT, SA)
+    const itemNum = item.number;
 
-    if (item.item_type === "Bill" && congressNum && itemType && itemNum) {
-      itemDisplayNum = `${itemType}${itemNum}`;
-      const urlPathSegment = billTypePaths[itemType];
+    if (!item || typeof item !== "object") return listItem; // Return empty li if item invalid
+
+    // --- Logic using item.item_type set by backend ---
+    if (
+      item.item_type === "Bill" &&
+      congressNum &&
+      itemTypeCode &&
+      itemNum !== null
+    ) {
+      let itemDisplayNum = `${itemTypeCode}${itemNum}`;
+      const urlPathSegment = billTypePaths[itemTypeCode]; // Look up path using Type Code
       if (urlPathSegment) {
-        // Construct Bill URL
-        const billUrl = `https://www.congress.gov/bill/${congressNum}th-congress/${urlPathSegment}/${itemNum}`;
+        const url = `https://www.congress.gov/bill/${congressNum}th-congress/${urlPathSegment}/${itemNum}`;
         itemElement = document.createElement("a");
-        itemElement.href = billUrl;
+        itemElement.href = url;
         itemElement.target = "_blank";
         itemElement.rel = "noopener noreferrer";
         itemElement.textContent = itemDisplayNum;
       } else {
-        console.warn(`Could not form link for Bill type: ${itemType}`);
-        itemElement.textContent = itemDisplayNum; // Show text even if no link
+        console.warn(`No URL path found for Bill type: ${itemTypeCode}`);
+        itemElement.textContent = itemDisplayNum; // Show text even without link
       }
     } else if (
       item.item_type === "Amendment" &&
       congressNum &&
-      itemType &&
-      itemNum
+      itemTypeCode &&
+      itemNum !== null
     ) {
-      itemDisplayNum = `Amendment ${itemNum}`; // Or use itemType if preferred (e.g., HAMDT 123)
-      const urlPathSegment = billTypePaths[itemType]; // Use the type (e.g., HAMDT)
+      // Display text like "SA 123" or "HAMDT 456" based on type code
+      let itemDisplayNum = `${itemTypeCode} ${itemNum}`;
+      const urlPathSegment = billTypePaths[itemTypeCode]; // Look up path using Type Code (SA, SAMDT etc.)
       if (urlPathSegment) {
-        // Construct Amendment URL (Verify structure on congress.gov)
-        // Example structure - may need adjustment based on actual URLs
-        const amendmentUrl = `https://www.congress.gov/amendment/${congressNum}th-congress/${urlPathSegment}/${itemNum}`;
+        // Construct Amendment URL (Using structure consistent with billTypePaths)
+        const url = `https://www.congress.gov/amendment/${congressNum}th-congress/${urlPathSegment}/${itemNum}`;
         itemElement = document.createElement("a");
-        itemElement.href = amendmentUrl;
+        itemElement.href = url;
         itemElement.target = "_blank";
         itemElement.rel = "noopener noreferrer";
-        itemElement.textContent = itemDisplayNum; // Display "Amendment X"
+        itemElement.textContent = itemDisplayNum; // Display "SA 123" as link text
       } else {
-        console.warn(`Could not form link for Amendment type: ${itemType}`);
-        itemElement.textContent = itemDisplayNum;
+        console.warn(`No URL path found for Amendment type: ${itemTypeCode}`);
+        itemElement.textContent = itemDisplayNum; // Show text even without link
       }
     } else {
-      // Fallback for unknown types or missing data
-      itemDisplayNum = `Unknown Type: ${itemType || ""}${itemNum || "N/A"}`;
-      itemElement.textContent = itemDisplayNum;
+      // Fallback if item_type wasn't set or data missing
+      itemElement.textContent = `Item: ${itemTypeCode || "?"}${itemNum || "?"}`;
+      console.warn("Could not classify or link item:", item);
     }
+    // --- End logic ---
 
     listItem.appendChild(itemElement);
-    listItem.appendChild(document.createTextNode(`: ${itemTitle} `)); // Add title
-
-    // Add introduced date if available
+    listItem.appendChild(document.createTextNode(`: ${itemTitle} `));
     if (item.introduced_date) {
       listItem.appendChild(
         document.createTextNode(`(Introduced: ${item.introduced_date}) `)
       );
     }
-
-    // Add latest action if available
     if (item.latest_action_text && item.latest_action_text !== "N/A") {
       listItem.appendChild(
         document.createTextNode(
@@ -138,14 +137,11 @@ document.addEventListener("DOMContentLoaded", () => {
           })`
         )
       );
-    } else {
-      listItem.appendChild(document.createTextNode(`(No recent action found)`));
-    }
-
+    } else if (item.introduced_date) {
+      listItem.appendChild(document.createTextNode(`(No recent action)`));
+    } // Show only if intro date exists
     return listItem;
   }
-
-  // Removed createVoteListItem as votes aren't implemented
 
   function displayError(statusElement, listElement, message) {
     if (!statusElement) {
@@ -234,6 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       allMembersData = members; // Store the fetched members globally
+      console.log(`allMembersData:`, allMembersData);
       console.log(
         `Successfully fetched ${allMembersData.length} members for Congress ${congressNumber}.`
       );

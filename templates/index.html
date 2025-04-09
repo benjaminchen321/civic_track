@@ -1,3 +1,4 @@
+<!-- FILE: templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,21 +10,20 @@
 <body>
     <h1>CivicTrack - Legislative Activity</h1>
 
-    <!-- Filter Controls -->
+    <!-- Filter Controls (Keep as before) -->
     <div id="filter-controls">
-         <!-- START: Add Congress Filter -->
          <div class="filter-group">
              <label for="congress-filter">Congress:</label>
              <select id="congress-filter">
-                 <!-- Options populated by JS -->
-                 {% for congress_info in congresses %}
-                 <option value="{{ congress_info.number }}" {% if congress_info.number == current_congress %}selected{% endif %}>
-                     {{ congress_info.number }} ({{ congress_info.startYear }}-{{ congress_info.endYear or 'Present' }})
+                 {% for c in congresses %}
+                 <option value="{{ c.number }}" {% if c.number == current_congress %}selected{% endif %}>
+                     {{ c.number }} ({{ c.startYear or '?' }}-{{ c.endYear or 'Present' }})
                  </option>
+                 {% else %}
+                 <option value="">No Congresses Loaded</option>
                  {% endfor %}
              </select>
          </div>
-         <!-- END: Add Congress Filter -->
          <div class="filter-group">
             <label for="name-search">Search by Name:</label>
             <input type="text" id="name-search" placeholder="Enter name...">
@@ -38,9 +38,9 @@
          <div class="filter-group">
              <span class="filter-label">Filter by Chamber:</span>
              <label><input type="radio" name="chamber-filter" value="ALL" checked> All</label>
-             {% for chamber in chambers %}
-             {% if chamber %}
-             <label><input type="radio" name="chamber-filter" value="{{ chamber }}"> {{ chamber }}</label>
+             {% for ch in chambers %}
+             {% if ch %}
+             <label><input type="radio" name="chamber-filter" value="{{ ch }}"> {{ ch }}</label>
              {% endif %}
              {% endfor %}
          </div>
@@ -48,80 +48,72 @@
              <label for="state-filter">Filter by State:</label>
              <select id="state-filter">
                  <option value="ALL">All States</option>
-                 {% for state in states %}
-                 <option value="{{ state }}">{{ state }}</option>
+                 {% for s_name in states %}
+                 <option value="{{ s_name }}">{{ s_name }}</option>
                  {% endfor %}
              </select>
          </div>
     </div>
 
-    <!-- Member Selection -->
+    <!-- Member Selection (Keep as before) -->
     <div id="member-selection-area">
         <label for="member-select">Choose a Member:</label>
         <div id="member-select-container">
-            <!-- Dropdown populated by JS -->
-            <select name="members" id="member-select" disabled> <!-- Start disabled -->
+            <select name="members" id="member-select" disabled>
                <option value="">-- Select Congress First --</option>
             </select>
-            <!-- Loading indicator for member list -->
-            <span id="member-list-loader" class="loader" style="display: none; vertical-align: middle; margin-left: 10px;"></span>
-            <span id="member-list-error" class="error-message" style="display: none; vertical-align: middle; margin-left: 10px;"></span>
+            <span id="member-list-loader" class="loader"></span>
+            <span id="member-list-error" class="error-message"></span>
          </div>
      </div>
 
-    <!-- Member Info Display (No changes needed here for now) -->
-    <div id="member-info" class="hidden" style="margin-top: 20px;">
-        <!-- Tab Navigation -->
+    <!-- Member Info Display (Keep wrapper as before) -->
+    <div id="member-info" class="hidden">
         <div class="tab-nav">
             <button class="tab-button active" data-tab="details-tab">Details</button>
             <button class="tab-button" data-tab="sponsored-tab">Sponsored</button>
             <button class="tab-button" data-tab="cosponsored-tab">Cosponsored</button>
         </div>
-        <!-- Tab Content -->
         <div class="tab-content">
+
             <!-- Details Tab -->
-            <div id="details-tab" class="tab-pane active">
+            <div id="details-tab" class="tab-pane active" aria-live="polite">
+                 <!-- Removed the #member-status wrapper -->
                  <h2>Member Details</h2>
-                 <div id="member-status" aria-live="polite">
-                    <div class="member-photo-container">
-                         <img id="member-photo" src="" alt="Member Photo" style="display: none;">
-                         <span id="photo-loading-error" class="error-message" style="display: none;">Photo not available</span>
-                    </div>
-                    <div id="member-details-content">Select a member to view details.</div>
+                 <!-- Photo and Details are now DIRECT children of #details-tab -->
+                 <div class="member-photo-container">
+                      <img id="member-photo" src="" alt="Member Photo" style="display: none;">
+                      <span id="photo-loading-error" class="error-message"></span>
                  </div>
+                 <div id="member-details-content">Select a member to view details.</div>
+                 <!-- End of direct children -->
             </div>
-             <!-- Sponsored Legislation Tab -->
+
+            <!-- Sponsored Tab (Keep as before) -->
             <div id="sponsored-tab" class="tab-pane">
                  <h2>Recently Sponsored Legislation</h2>
                  <div id="sponsored-items-status" aria-live="polite">
                     <div class="loader"></div>
-                    <ul id="sponsored-items-list">
-                        <li>Loading...</li>
-                    </ul>
+                    <ul id="sponsored-items-list"><li>Loading...</li></ul>
                  </div>
             </div>
-            <!-- Cosponsored Legislation Tab -->
+
+            <!-- Cosponsored Tab (Keep as before) -->
             <div id="cosponsored-tab" class="tab-pane">
                  <h2>Recently Cosponsored Legislation</h2>
                  <div id="cosponsored-items-status" aria-live="polite">
                     <div class="loader"></div>
-                    <ul id="cosponsored-items-list">
-                        <li>Loading...</li>
-                    </ul>
+                    <ul id="cosponsored-items-list"><li>Loading...</li></ul>
                  </div>
             </div>
         </div>
     </div>
 
-    <!-- NO LONGER embedding member list JSON -->
+    <!-- Scripts (Keep as before) -->
     <script>
-        // Global variable to hold the currently loaded FULL member list for the selected Congress
         let currentCongressMembers = [];
-        // Store the initially selected Congress
-        const initialCongress = {{ current_congress|tojson|safe }};
+        const initialCongress = {{ current_congress | tojson | safe }};
     </script>
-
-    <!-- Link your main script AFTER the data/variables are defined -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

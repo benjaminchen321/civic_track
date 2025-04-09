@@ -1,40 +1,37 @@
+# FILE: app.py
 import os
 import json
 import requests
 from flask import Flask, jsonify, render_template, request
 from flask_caching import Cache
-from urllib.parse import urlparse, parse_qs  # Import urlparse
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 
-# --- Cache Configuration ---
+# Cache Config
 cache_config = {
     "CACHE_TYPE": "FileSystemCache",
     "CACHE_DIR": "flask_cache",
-    "CACHE_DEFAULT_TIMEOUT": 3600,  # Cache default 1 hour
+    "CACHE_DEFAULT_TIMEOUT": 3600,
 }
 app.config.from_mapping(cache_config)
 cache = Cache(app)
-# --- End Cache Configuration ---
 
-# Load API Key
+# API Key and Base URL
 CONGRESS_GOV_API_KEY = os.environ.get("CONGRESS_GOV_API_KEY")
 if not CONGRESS_GOV_API_KEY:
-    print("CRITICAL WARNING: CONGRESS_GOV_API_KEY environment variable not set.")
-    # exit(1)
-
+    print("CRITICAL WARNING: CONGRESS_GOV_API_KEY env var missing.")
 API_BASE_URL = "https://api.congress.gov/v3"
 
+# Amendment Types (lowercase, as parsed from URL)
+AMENDMENT_TYPES = {"samdt", "hamdt", "sa", "ha"}
 
-# --- START: Generic API Helper ---
-# (Keep _make_api_request function exactly as corrected in the previous response)
+
+# --- Generic API Helper (No changes) ---
 def _make_api_request(endpoint, params=None, timeout=15):
-    """
-    Makes a request to the Congress.gov API.
-    (No changes needed in this helper function from the previous version)
-    """
+    """Makes a request to the Congress.gov API."""
     if not CONGRESS_GOV_API_KEY:
-        return None, "API Key not configured."
+        return None, "API Key missing."
     request_params = params.copy() if params else {}
     request_params["api_key"] = CONGRESS_GOV_API_KEY
     request_params.setdefault("format", "json")
@@ -43,59 +40,51 @@ def _make_api_request(endpoint, params=None, timeout=15):
     log_params["api_key"] = "***MASKED***"
     print(f"API Request: GET {url} PARAMS: {log_params}")
     headers = {"Accept": "application/json"}
-    response = None  # Initialize response to None
+    response = None
     try:
         response = requests.get(
             url, headers=headers, params=request_params, timeout=timeout
         )
         response.raise_for_status()
         data = response.json()
-        return data, None  # Success
+        return data, None
     except requests.exceptions.Timeout:
-        error_msg = f"Request timed out after {timeout}s for endpoint {endpoint}"
+        error_msg = f"Timeout for {endpoint}"
         print(f"ERROR: {error_msg}")
         return None, error_msg
     except requests.exceptions.HTTPError as e:
         status_code = e.response.status_code
-        error_text = e.response.text  # Default error text
+        error_text = e.response.text
         try:
             error_details = e.response.json()
             api_error_message = error_details.get("error", {}).get(
                 "message", ""
             ) or error_details.get("message", error_text)
-            error_msg = f"API HTTP Error {status_code}: {api_error_message}"
+            error_msg = f"API HTTP {status_code}: {api_error_message}"
         except json.JSONDecodeError:
-            error_msg = f"API HTTP Error {status_code}: {error_text}"
+            error_msg = f"API HTTP {status_code}: {error_text}"
         print(f"ERROR: {error_msg}")
         return None, error_msg
     except requests.exceptions.RequestException as e:
-        error_msg = f"Network error connecting to API: {e}"
+        error_msg = f"Network error: {e}"
         print(f"ERROR: {error_msg}")
         return None, error_msg
     except json.JSONDecodeError as e:
         resp_text = response.text[:500] if response else "N/A"
-        error_msg = f"Failed to decode JSON response from {endpoint}: {e}. Response text: {resp_text}..."
+        error_msg = f"JSON Error: {e}. Resp: {resp_text}..."
         print(f"ERROR: {error_msg}")
         return None, error_msg
     except Exception as e:
-        error_msg = f"Unexpected error during API request to {endpoint}: {e}"
+        error_msg = f"API Error: {e}"
         print(f"ERROR: {error_msg}")
         return None, error_msg
 
 
-# --- END: Generic API Helper ---
-
-
 # --- Helper Functions ---
-
-
-# (Keep load_congress_members, get_member_details, get_sponsored_legislation, get_cosponsored_legislation as before)
-# ... (Previous helper functions unchanged) ...
 @cache.memoize(timeout=43200)
 def load_congress_members(congress_num=None):
-    print(
-        f"Attempting to execute load_congress_members (Congress: {congress_num or 'All'})..."
-    )
+    """Loads member list, optionally filtered by Congress."""
+    print(f"Loading members (Congress: {congress_num or 'All'})...")
     members_data = {}
     limit = 250
     endpoint = "/member"
@@ -104,473 +93,412 @@ def load_congress_members(congress_num=None):
         endpoint = f"/member/congress/{congress_num}"
     data, error = _make_api_request(endpoint, params=params)
     if error:
-        print(f"CRITICAL ERROR in load_congress_members: {error}")
+        print(f"ERROR loading members: {error}")
         return members_data
     if not data or "members" not in data or not isinstance(data["members"], list):
-        print(
-            f"Warning: Invalid data structure received from {endpoint}. Expected 'members' list. Got keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}"
-        )
+        print("Warn: Bad member data struct.")
         return members_data
     members = data["members"]
-    print(f"Successfully fetched {len(members)} members from API. Processing...")
+    print(f"Processing {len(members)} members...")
     for member in members:
         if not isinstance(member, dict):
-            print(f"Warning: Skipping non-dictionary item in members list: {member}")
             continue
         bioguide_id = member.get("bioguideId")
         if not bioguide_id:
-            print("Warning: Skipping member entry missing bioguideId.")
             continue
         party_name = member.get("partyName", "")
-        party_code = "ID"
+        p_code = "ID"
         if party_name == "Democratic":
-            party_code = "D"
+            p_code = "D"
         elif party_name == "Republican":
-            party_code = "R"
+            p_code = "R"
         state = member.get("state")
         district = member.get("district")
-        current_chamber = None
-        if district is not None:
-            current_chamber = "House"
-        elif state is not None:
-            current_chamber = "Senate"
+        chamber = (
+            "House" if district is not None else "Senate" if state is not None else None
+        )
         members_data[bioguide_id] = {
-            "name": member.get("name", f"Unknown ({bioguide_id})"),
+            "name": member.get("name", f"? ({bioguide_id})"),
             "bioguide_id": bioguide_id,
             "state": state,
             "party": party_name,
-            "party_code": party_code,
-            "chamber": current_chamber,
+            "party_code": p_code,
+            "chamber": chamber,
             "congress": member.get("congress") or congress_num,
         }
-    print(f"Finished processing {len(members_data)} members.")
+    print(f"Finished {len(members_data)} members.")
     return members_data
 
 
 @cache.memoize(timeout=3600)
 def get_member_details(bioguide_id):
+    """Fetches detailed info for a member."""
     endpoint = f"/member/{bioguide_id}"
     data, error = _make_api_request(endpoint)
-    member_payload = {"details": None, "error": error}
+    payload = {"details": None, "error": error}
     if data and "member" in data and isinstance(data["member"], dict):
-        member_data = data["member"]
-        party_name = "Unknown"
-        party_history = member_data.get("partyHistory")
-        if isinstance(party_history, list) and party_history:
-            last_party = party_history[-1]
-            if isinstance(last_party, dict):
-                party_name = last_party.get("partyName", "Unknown")
+        m_data = data["member"]
+        p_name = "Unknown"
+        p_hist = m_data.get("partyHistory")
+        if isinstance(p_hist, list) and p_hist:
+            last_p = p_hist[-1]
+            p_name = (
+                last_p.get("partyName", "?") if isinstance(last_p, dict) else p_name
+            )
         else:
-            party_name = member_data.get("partyName", "Unknown")
-        member_payload["details"] = {
-            "name": member_data.get("directOrderName")
-            or member_data.get("invertedOrderName")
-            or member_data.get("name"),
-            "bioguide_id": member_data.get("bioguideId"),
-            "state": member_data.get("state"),
-            "party": party_name,
-            "birth_year": member_data.get("birthYear"),
-            "leadership": member_data.get("leadership", []),
-            "website_url": member_data.get("directUrl") or member_data.get("url"),
-            "terms": member_data.get("terms"),
+            p_name = m_data.get("partyName", "?")
+        payload["details"] = {
+            "name": m_data.get("directOrderName")
+            or m_data.get("invertedOrderName")
+            or m_data.get("name"),
+            "bioguide_id": m_data.get("bioguideId"),
+            "state": m_data.get("state"),
+            "party": p_name,
+            "birth_year": m_data.get("birthYear"),
+            "leadership": m_data.get("leadership", []),
+            "website_url": m_data.get("directUrl") or m_data.get("url"),
+            "terms": m_data.get("terms"),
         }
-        print(f"Successfully processed details for {bioguide_id}")
     elif not error:
-        member_payload["error"] = (
-            f"Member data format unexpected in response. Keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}"
+        payload["error"] = (
+            f"Bad detail format. Keys:{list(data.keys()) if isinstance(data, dict) else 'N/A'}"
         )
-        print(f"ERROR: {member_payload['error']} for {bioguide_id}")
-    return member_payload
+    return payload
+
+
+def _parse_legislation_item(item):
+    """Helper function to parse legislation item (Bill or Amendment)."""
+    if not isinstance(item, dict):
+        print(f"Warn: Non-dict item: {item}")
+        return None
+
+    latest_action = item.get("latestAction", {})
+    if not isinstance(latest_action, dict):
+        latest_action = {}
+
+    item_data = {
+        "item_type": None,
+        "number": None,
+        "type": None,  # Will be populated below
+        "title": item.get("title")
+        or item.get("officialTitle")
+        or item.get("purpose")
+        or "No Title Provided",
+        "congress": item.get("congress"),
+        "introduced_date": item.get("introducedDate"),
+        "latest_action_text": latest_action.get("text", "N/A"),
+        "latest_action_date": latest_action.get("actionDate", "N/A"),
+        "url": item.get("url"),
+    }
+
+    amendment_num = item.get("amendmentNumber")  # Check this FIRST
+    bill_num = item.get("number")
+    original_type = item.get("type")  # Can be "None" string or actual type
+
+    # --- START: Corrected Logic ---
+    if amendment_num is not None:
+        item_data["item_type"] = "Amendment"
+        item_data["number"] = (
+            amendment_num  # Use amendmentNumber as the 'number' for amendments
+        )
+        item_data["title"] = item_data["title"] or f"Amendment {amendment_num}"
+
+        # MUST parse type from URL because original_type is often "None"
+        parsed_type_from_url = None
+        if item_data["url"]:
+            try:
+                parsed_url = urlparse(item_data["url"])
+                path_segments = parsed_url.path.strip("/").split("/")
+                # Example: /v3/amendment/119/samdt/2216 -> path_segments[-2] is 'samdt'
+                if len(path_segments) >= 5 and path_segments[1] == "amendment":
+                    type_code = path_segments[-2].lower()
+                    if type_code in AMENDMENT_TYPES:
+                        parsed_type_from_url = type_code.upper()  # Store parsed type
+                        print(
+                            f"Debug: Parsed Amendment Type from URL: {parsed_type_from_url} for #{amendment_num}"
+                        )
+                    else:
+                        print(
+                            f"Warn: URL segment '{type_code}' not in known AMENDMENT_TYPES: {item_data['url']}"
+                        )
+                else:
+                    print(f"Warn: Unexpected Amend URL path: {item_data['url']}")
+            except Exception as e:
+                print(f"Error parsing Amend URL type: {e}")
+
+        # Assign the parsed type if found
+        if parsed_type_from_url:
+            item_data["type"] = parsed_type_from_url
+        else:
+            # If URL parsing also fails, we can't proceed
+            print(
+                f"Warn: Cannot determine type for Amendment #{amendment_num} (skipping)"
+            )
+            return None
+
+    # If it wasn't an amendment (no amendmentNumber), check for Bill
+    elif bill_num is not None and original_type is not None and original_type != "None":
+        item_data["item_type"] = "Bill"
+        item_data["number"] = bill_num
+        item_data["type"] = original_type  # Use the provided type for Bills
+        item_data["title"] = item_data["title"] or f"Bill {original_type}{bill_num}"
+    else:
+        # If it doesn't match either pattern
+        print(f"Warn: Unrecognized item format (skipping): {item}")
+        return None
+    # --- END: Corrected Logic ---
+
+    return item_data
 
 
 @cache.memoize(timeout=1800)
 def get_sponsored_legislation(bioguide_id):
+    """Fetches and parses recent sponsored legislation."""
     endpoint = f"/member/{bioguide_id}/sponsored-legislation"
     params = {"limit": 15}
     data, error = _make_api_request(endpoint, params=params)
     legislation_data = {"items": [], "error": error}
     item_list = None
     if data:
-        possible_keys = ["sponsoredLegislation", "legislation", "items"]
-        for key in possible_keys:
+        for key in ["sponsoredLegislation", "legislation", "items"]:
             if key in data and isinstance(data.get(key), list):
                 item_list = data[key]
                 break
-    if item_list is not None:
+    if item_list:
         print(f"Processing {len(item_list)} sponsored items for {bioguide_id}...")
         for item in item_list:
-            if not isinstance(item, dict):
-                continue
-            latest_action = item.get("latestAction", {})
-            if not isinstance(latest_action, dict):
-                latest_action = {}
-            item_data = {
-                "item_type": (
-                    "Bill"
-                    if item.get("number") is not None
-                    else (
-                        "Amendment"
-                        if item.get("amendmentNumber") is not None
-                        else "Unknown"
-                    )
-                ),
-                "number": item.get("number") or item.get("amendmentNumber"),
-                "type": item.get("type"),
-                "title": item.get("title")
-                or item.get("officialTitle")
-                or f"Item {item.get('type', '')}{item.get('number') or item.get('amendmentNumber', '')}",
-                "congress": item.get("congress"),
-                "introduced_date": item.get("introducedDate"),
-                "latest_action_text": latest_action.get("text", "N/A"),
-                "latest_action_date": latest_action.get("actionDate", "N/A"),
-            }
-            if item_data["item_type"] != "Unknown":
-                legislation_data["items"].append(item_data)
-            else:
-                print(f"Warning: Could not determine type for sponsored item: {item}")
-    elif not error and data is not None:
-        print(
-            f"No sponsored legislation items found or key mismatch for {bioguide_id}. API keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}"
-        )
-        if isinstance(error, str) and ("404" in error or "Not Found" in error):
-            legislation_data["error"] = None
+            parsed_item = _parse_legislation_item(item)  # Use helper
+            if parsed_item:
+                legislation_data["items"].append(parsed_item)
+    elif not error and data:
+        print(f"No sponsored items found/key mismatch for {bioguide_id}.")
     return legislation_data
 
 
 @cache.memoize(timeout=1800)
 def get_cosponsored_legislation(bioguide_id):
+    """Fetches and parses recent cosponsored legislation."""
     endpoint = f"/member/{bioguide_id}/cosponsored-legislation"
     params = {"limit": 15}
     data, error = _make_api_request(endpoint, params=params)
     legislation_data = {"items": [], "error": error}
     item_list = None
     if data:
-        possible_keys = ["cosponsoredLegislation", "legislation", "items"]
-        for key in possible_keys:
+        for key in ["cosponsoredLegislation", "legislation", "items"]:
             if key in data and isinstance(data.get(key), list):
                 item_list = data[key]
                 break
-    if item_list is not None:
+    if item_list:
         print(f"Processing {len(item_list)} cosponsored items for {bioguide_id}...")
         for item in item_list:
-            if not isinstance(item, dict):
-                continue
-            latest_action = item.get("latestAction", {})
-            if not isinstance(latest_action, dict):
-                latest_action = {}
-            item_data = {
-                "item_type": (
-                    "Bill"
-                    if item.get("number") is not None
-                    else (
-                        "Amendment"
-                        if item.get("amendmentNumber") is not None
-                        else "Unknown"
-                    )
-                ),
-                "number": item.get("number") or item.get("amendmentNumber"),
-                "type": item.get("type"),
-                "title": item.get("title")
-                or item.get("officialTitle")
-                or f"Item {item.get('type', '')}{item.get('number') or item.get('amendmentNumber', '')}",
-                "congress": item.get("congress"),
-                "introduced_date": item.get("introducedDate"),
-                "latest_action_text": latest_action.get("text", "N/A"),
-                "latest_action_date": latest_action.get("actionDate", "N/A"),
-            }
-            if item_data["item_type"] != "Unknown":
-                legislation_data["items"].append(item_data)
-            else:
-                print(f"Warning: Could not determine type for cosponsored item: {item}")
-    elif not error and data is not None:
-        print(
-            f"No cosponsored legislation items found or key mismatch for {bioguide_id}. API keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}"
-        )
-        if isinstance(error, str) and ("404" in error or "Not Found" in error):
-            legislation_data["error"] = None
+            parsed_item = _parse_legislation_item(item)  # Use helper
+            if parsed_item:
+                legislation_data["items"].append(parsed_item)
+    elif not error and data:
+        print(f"No cosponsored items/key mismatch for {bioguide_id}.")
     return legislation_data
 
 
-# --- START: Modified Function to get Congress List ---
-@cache.memoize(timeout=86400)  # Cache for a day
+@cache.memoize(timeout=86400)
 def get_congress_list():
     """Fetches the list of available Congresses and extracts the number."""
-    print("Fetching list of Congresses...")
+    print("Fetching Congress list...")
     congresses_list = []
     data, error = _make_api_request("/congress")
-
     if error:
         print(f"Error fetching Congress list: {error}")
-        return congresses_list  # Return empty list on error
-
+        return congresses_list
     if data and "congresses" in data and isinstance(data["congresses"], list):
         raw_congresses = data["congresses"]
-        print(f"Processing {len(raw_congresses)} congress entries from API...")
         valid_congresses = []
-        for congress_item in raw_congresses:
-            # Ensure item is a dict and has 'url'
-            if isinstance(congress_item, dict) and "url" in congress_item:
-                congress_number = None
+        for item in raw_congresses:
+            if isinstance(item, dict) and "url" in item:
+                num = None
+                url_path = urlparse(item["url"]).path.strip("/").split("/")
                 try:
-                    # Parse the URL to extract the path
-                    parsed_url = urlparse(congress_item["url"])
-                    path_segments = parsed_url.path.strip("/").split("/")
-                    # The number should be the last segment before query params
-                    if len(path_segments) > 0 and path_segments[-1].isdigit():
-                        congress_number = int(path_segments[-1])
+                    if url_path and url_path[-1].isdigit():
+                        num = int(url_path[-1])
                     else:
-                        # Fallback: Try parsing from name like "119th Congress"
-                        name = congress_item.get("name", "")
-                        if "th Congress" in name:
-                            num_str = name.split("th Congress")[0]
-                            if num_str.isdigit():
-                                congress_number = int(num_str)
-
-                except (ValueError, TypeError, IndexError) as e:
-                    print(
-                        f"Warning: Could not extract congress number for item {congress_item}: {e}"
-                    )
-
-                # If we successfully extracted a number, add it to the dict and the list
-                if congress_number is not None:
-                    congress_item["number"] = congress_number  # Add the number key
-                    valid_congresses.append(congress_item)
-                else:
-                    print(
-                        f"Warning: Failed to extract number for congress item: {congress_item}"
-                    )
-            else:
-                print(
-                    f"Warning: Skipping invalid congress item structure or missing URL: {congress_item}"
-                )
-
-        # Sort valid congresses descending by the extracted number
+                        name = item.get("name", "")
+                        num_str = name.split("th Congress")[0]
+                        num = (
+                            int(num_str)
+                            if "th Congress" in name and num_str.isdigit()
+                            else None
+                        )
+                except (ValueError, TypeError, IndexError):
+                    pass
+                if num is not None:
+                    item["number"] = num
+                    valid_congresses.append(item)
         if valid_congresses:
-            # Sort using the 'number' key we just added
             congresses_list = sorted(
                 valid_congresses, key=lambda x: x.get("number", 0), reverse=True
             )
-            print(
-                f"Successfully processed and sorted {len(congresses_list)} valid congresses."
-            )
-        else:
-            print("Warning: No valid congress entries found after processing.")
-    else:
-        print(
-            f"Warning: Could not parse Congress list. 'congresses' key missing or not a list in response. Keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}"
-        )
-
     return congresses_list
 
 
-# --- END: Modified Function to get Congress List ---
-
-# --- End Helper Functions ---
-
-# --- Load Initial Data on Startup ---
-print("Fetching initial Congress list on startup...")
-AVAILABLE_CONGRESSES = (
-    get_congress_list()
-)  # Should now return list of dicts with 'number' key
-
-# --- Robust Default Congress Selection (Should work now) ---
-DEFAULT_CONGRESS = None
-if AVAILABLE_CONGRESSES:
-    first_congress_item = AVAILABLE_CONGRESSES[0]
-    # Access the 'number' key we added in get_congress_list
-    if isinstance(first_congress_item, dict) and "number" in first_congress_item:
-        DEFAULT_CONGRESS = first_congress_item["number"]
-    else:
-        # This warning should ideally not appear now if get_congress_list worked
-        print(
-            f"Warning: First item in processed AVAILABLE_CONGRESSES is invalid: {first_congress_item}"
-        )
-
-# Use .get() for safer access in list comprehension during logging
-print(
-    f"Available Congresses: {[c.get('number', 'N/A') for c in AVAILABLE_CONGRESSES]}. Default Selected: {DEFAULT_CONGRESS}"
+# --- Load Initial Data ---
+print("Fetching initial Congress list...")
+AVAILABLE_CONGRESSES = get_congress_list()
+DEFAULT_CONGRESS = (
+    AVAILABLE_CONGRESSES[0]["number"]
+    if AVAILABLE_CONGRESSES and AVAILABLE_CONGRESSES[0].get("number")
+    else None
 )
-
-# --- End Load Initial Data ---
+print(
+    f"Congresses: {[c.get('number', 'N/A') for c in AVAILABLE_CONGRESSES]}. Default: {DEFAULT_CONGRESS}"
+)
 
 
 # --- Flask Routes ---
-
-
-# (Keep /api/members, /, /api/member/<bioguide_id>, placeholder routes as before)
-# ... (Flask routes unchanged from previous correct version) ...
 @app.route("/api/members")
 def get_members_list_data():
     """API endpoint to fetch member list based on filters."""
-    congress_filter = request.args.get("congress")
+    congress_filter = request.args.get("congress") or (
+        str(DEFAULT_CONGRESS) if DEFAULT_CONGRESS else None
+    )
     if not congress_filter or not congress_filter.isdigit():
-        if DEFAULT_CONGRESS:
-            print(
-                f"Warning: Invalid/missing congress query param, defaulting to {DEFAULT_CONGRESS}"
-            )
-            congress_filter = str(DEFAULT_CONGRESS)
-        else:
-            print(
-                "Error: Congress query parameter missing or invalid, and no default congress set."
-            )
-            return (
-                jsonify({"error": "Valid 'congress' query parameter is required."}),
-                400,
-            )
+        return jsonify({"error": "Valid 'congress' query parameter required."}), 400
     members_dict = load_congress_members(congress_filter)
     if not members_dict:
-        print(
-            f"Error: Could not load members for Congress {congress_filter} in API route."
-        )
         return (
             jsonify(
-                {
-                    "error": f"Could not load members for Congress {congress_filter}. Check API key or network."
-                }
+                {"error": f"Could not load members for Congress {congress_filter}."}
             ),
             500,
         )
-    all_members_list = list(members_dict.values())
-    return jsonify(all_members_list)
+    return jsonify(list(members_dict.values()))
 
 
 @app.route("/")
 def index():
     """Serves the main HTML page."""
     print("Serving index page...")
-    congresses_for_template = AVAILABLE_CONGRESSES if AVAILABLE_CONGRESSES else []
-    static_states = [
-        "AL",
-        "AK",
-        "AZ",
-        "AR",
-        "CA",
-        "CO",
-        "CT",
-        "DE",
-        "FL",
-        "GA",
-        "HI",
-        "ID",
-        "IL",
-        "IN",
-        "IA",
-        "KS",
-        "KY",
-        "LA",
-        "ME",
-        "MD",
-        "MA",
-        "MI",
-        "MN",
-        "MS",
-        "MO",
-        "MT",
-        "NE",
-        "NV",
-        "NH",
-        "NJ",
-        "NM",
-        "NY",
-        "NC",
-        "ND",
-        "OH",
-        "OK",
-        "OR",
-        "PA",
-        "RI",
-        "SC",
-        "SD",
-        "TN",
-        "TX",
-        "UT",
-        "VT",
-        "VA",
-        "WA",
-        "WV",
-        "WI",
-        "WY",
-        "AS",
-        "DC",
-        "FM",
-        "GU",
-        "MH",
-        "MP",
-        "PW",
-        "PR",
-        "VI",
-    ]
-    static_states.sort()
-    static_chambers = ["House", "Senate"]
+    states = sorted(
+        [
+            "Alabama",
+            "Alaska",
+            "Arizona",
+            "Arkansas",
+            "California",
+            "Colorado",
+            "Connecticut",
+            "Delaware",
+            "Florida",
+            "Georgia",
+            "Hawaii",
+            "Idaho",
+            "Illinois",
+            "Indiana",
+            "Iowa",
+            "Kansas",
+            "Kentucky",
+            "Louisiana",
+            "Maine",
+            "Maryland",
+            "Massachusetts",
+            "Michigan",
+            "Minnesota",
+            "Mississippi",
+            "Missouri",
+            "Montana",
+            "Nebraska",
+            "Nevada",
+            "New Hampshire",
+            "New Jersey",
+            "New Mexico",
+            "New York",
+            "North Carolina",
+            "North Dakota",
+            "Ohio",
+            "Oklahoma",
+            "Oregon",
+            "Pennsylvania",
+            "Rhode Island",
+            "South Carolina",
+            "South Dakota",
+            "Tennessee",
+            "Texas",
+            "Utah",
+            "Vermont",
+            "Virginia",
+            "Washington",
+            "West Virginia",
+            "Wisconsin",
+            "Wyoming",
+            "American Samoa",
+            "District of Columbia",
+            "Federated States of Micronesia",
+            "Guam",
+            "Marshall Islands",
+            "Northern Mariana Islands",
+            "Palau",
+            "Puerto Rico",
+            "Virgin Islands",
+        ]
+    )
     return render_template(
         "index.html",
-        congresses=congresses_for_template,
+        congresses=AVAILABLE_CONGRESSES,
         current_congress=DEFAULT_CONGRESS,
-        states=static_states,
-        chambers=static_chambers,
+        states=states,
+        chambers=["House", "Senate"],
     )
 
 
 @app.route("/api/member/<bioguide_id>")
 def get_member_data(bioguide_id):
-    if not bioguide_id or not isinstance(bioguide_id, str) or len(bioguide_id) != 7:
-        print(f"Invalid bioguide_id format received: {bioguide_id}")
-        return jsonify({"error": "Invalid member ID format."}), 400
-    print(f"API call received for member data: {bioguide_id}")
-    member_data = get_member_details(bioguide_id)
-    sponsored_legis_data = get_sponsored_legislation(bioguide_id)
-    cosponsored_legis_data = get_cosponsored_legislation(bioguide_id)
-    combined_data = {
+    """API endpoint fetching all data for a specific member."""
+    if not bioguide_id or len(bioguide_id) != 7:
+        return jsonify({"error": "Invalid member ID."}), 400
+    print(f"API call for member: {bioguide_id}")
+    details_data = get_member_details(bioguide_id)
+    sponsored_data = get_sponsored_legislation(bioguide_id)
+    cosponsored_data = get_cosponsored_legislation(bioguide_id)
+    combined = {
         "error": None,
-        "member_details": member_data.get("details"),
-        "member_details_error": member_data.get("error"),
+        "member_details": details_data.get("details"),
+        "member_details_error": details_data.get("error"),
         "committees": None,
-        "committees_error": "Committee data fetching not implemented.",
-        "sponsored_items": sponsored_legis_data.get("items", []),
-        "sponsored_items_error": sponsored_legis_data.get("error"),
-        "cosponsored_items": cosponsored_legis_data.get("items", []),
-        "cosponsored_items_error": cosponsored_legis_data.get("error"),
+        "committees_error": "Not implemented.",
+        "sponsored_items": sponsored_data.get("items", []),
+        "sponsored_items_error": sponsored_data.get("error"),
+        "cosponsored_items": cosponsored_data.get("items", []),
+        "cosponsored_items_error": cosponsored_data.get("error"),
         "votes": [],
-        "votes_error": "Vote data fetching not implemented.",
+        "votes_error": "Not implemented.",
     }
-    status_code = 200
-    details_error = member_data.get("error")
-    if details_error and (
-        "404" in details_error
-        or "Not Found" in details_error
-        or "Invalid" in details_error
-    ):
-        status_code = 404
-        combined_data["error"] = f"Member {bioguide_id} not found or invalid ID."
-        print(
-            f"Member details fetch failed significantly for {bioguide_id}, returning 404."
+    details_err = details_data.get("error")
+    status = (
+        404
+        if details_err
+        and (
+            "404" in details_err
+            or "Not Found" in details_err
+            or "Invalid" in details_err
         )
-    print(f"Returning combined data for {bioguide_id} with status {status_code}")
-    return jsonify(combined_data), status_code
+        else 200
+    )
+    if status == 404:
+        combined["error"] = f"Member {bioguide_id} not found."
+    print(f"Returning data for {bioguide_id}, status {status}")
+    return jsonify(combined), status
 
 
+# --- Placeholder routes ---
 @app.route("/bills")
 def bills_page():
-    return "Bill Search Page - Not Implemented Yet", 501
+    return "Not Implemented", 501
 
 
 @app.route("/bill/<int:congress>/<bill_type>/<int:bill_number>")
 def bill_detail_page(congress, bill_type, bill_number):
-    return (
-        f"Bill Detail Page for {bill_type.upper()}{bill_number} ({congress}th Congress) - Not Implemented Yet",
-        501,
-    )
+    return "Not Implemented", 501
 
 
-# --- End Flask Routes ---
-
+# --- Main Execution ---
 if __name__ == "__main__":
     cache_dir = app.config.get("CACHE_DIR", "flask_cache")
-    if not os.path.exists(cache_dir):
-        try:
-            os.makedirs(cache_dir)
-            print(f"Created cache directory: {cache_dir}")
-        except OSError as e:
-            print(f"ERROR: Could not create cache directory '{cache_dir}': {e}")
-
+    os.makedirs(cache_dir, exist_ok=True)  # Ensure cache directory exists
     app.run(debug=True)
