@@ -1,39 +1,34 @@
 /* FILE: static/style.css */
-
-/* --- Variables & Reset (Optional but good practice) --- */
+/* ... (Keep variables, reset, general styles as before) ... */
 :root {
-  --primary-color: #0d6efd; /* Bootstrap Blue */
+  --primary-color: #0d6efd;
   --primary-hover: #0b5ed7;
-  --text-color: #212529; /* Darker Gray */
-  --text-muted: #6c757d; /* Medium Gray */
-  --border-color: #dee2e6; /* Light Gray */
-  --background-light: #f8f9fa; /* Very Light Gray */
-  --background-card: #ffffff; /* White */
-  --background-control: #e9ecef; /* Control Background */
+  --text-color: #212529;
+  --text-muted: #6c757d;
+  --border-color: #dee2e6;
+  --background-light: #f8f9fa;
+  --background-card: #ffffff;
+  --background-control: #e9ecef;
   --danger-color: #dc3545;
   --danger-background: #f8d7da;
-  --border-radius: 0.375rem; /* 6px */
+  --border-radius: 0.375rem;
   --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
-
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
-
-/* --- General Body & Headings --- */
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   margin: 0;
-  padding: 30px; /* Increased padding */
+  padding: 30px;
   background-color: var(--background-light);
   line-height: 1.6;
   color: var(--text-color);
   font-size: 16px;
 }
-
 h1,
 h2,
 h3,
@@ -46,7 +41,7 @@ h4 {
 }
 h1 {
   margin-top: 0;
-  font-size: 2.25rem; /* Larger */
+  font-size: 2.25rem;
   text-align: center;
   margin-bottom: 1.5em;
   font-weight: 700;
@@ -56,7 +51,10 @@ h2 {
   font-size: 1.5rem;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.5em;
-}
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+} /* Flex for H2 + count */
 h3 {
   font-size: 1.25rem;
 }
@@ -66,15 +64,29 @@ h4 {
   margin-top: 1.5em;
 }
 
-/* --- Filter Controls --- */
+/* Style for item counts in H2 */
+.item-count {
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--text-muted);
+  background-color: var(--background-control);
+  padding: 0.15em 0.5em;
+  border-radius: 4px;
+  margin-left: 10px;
+}
+.item-count:empty {
+  display: none;
+} /* Hide if empty */
+
+/* Filters (Keep as before) */
 #filter-controls {
-  background-color: var(--background-card); /* White background */
+  background-color: var(--background-card);
   padding: 20px 25px;
   border-radius: var(--border-radius);
   margin-bottom: 30px;
   display: flex;
   flex-wrap: wrap;
-  gap: 25px; /* Increased gap */
+  gap: 25px;
   align-items: center;
   border: 1px solid var(--border-color);
   box-shadow: var(--box-shadow);
@@ -85,43 +97,41 @@ h4 {
   gap: 10px;
 }
 .filter-group label {
-  font-weight: 500; /* Slightly bolder labels */
+  font-weight: 500;
   cursor: pointer;
   color: var(--text-muted);
-  white-space: nowrap; /* Prevent labels wrapping weirdly */
+  white-space: nowrap;
 }
 .filter-label,
 #filter-controls label[for="name-search"],
 #filter-controls label[for="state-filter"],
 #filter-controls label[for="congress-filter"] {
-  font-weight: 600; /* Bold main labels */
+  font-weight: 600;
   color: var(--text-color);
-  margin-right: 0; /* Remove specific margin */
+  margin-right: 0;
 }
 #filter-controls input[type="text"],
 #filter-controls select {
-  padding: 0.5rem 0.75rem; /* Use rem */
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   font-size: 0.95rem;
-  background-color: var(--background-light); /* Light background for inputs */
+  background-color: var(--background-light);
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 #filter-controls input[type="text"]:focus,
 #filter-controls select:focus {
   border-color: var(--primary-color);
   outline: 0;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25); /* Focus ring */
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 #filter-controls input[type="radio"] {
   margin-right: 4px;
   vertical-align: middle;
-  accent-color: var(--primary-color); /* Modern radio color */
+  accent-color: var(--primary-color);
 }
-/* Custom Select Arrow (Optional Enhancement) */
-/* #filter-controls select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px; padding-right: 2.5rem; } */
 
-/* --- Member Selection --- */
+/* Member Selection (Keep as before) */
 #member-selection-area {
   margin-bottom: 30px;
   padding: 20px 25px;
@@ -129,28 +139,28 @@ h4 {
   border-radius: var(--border-radius);
   border: 1px solid var(--border-color);
   box-shadow: var(--box-shadow);
-  display: flex; /* Align label and select */
+  display: flex;
   align-items: center;
   gap: 15px;
 }
 #member-selection-area label {
   font-weight: 600;
   margin-right: 0;
-  flex-shrink: 0; /* Prevent label shrinking */
+  flex-shrink: 0;
 }
 #member-select-container {
-  display: flex; /* Align select and loader/error */
+  display: flex;
   align-items: center;
   gap: 10px;
-  flex-grow: 1; /* Allow container to grow */
+  flex-grow: 1;
 }
 #member-select {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  min-width: 350px; /* Slightly wider default */
-  width: 100%; /* Take available space */
-  max-width: 500px; /* Optional max width */
+  min-width: 350px;
+  width: 100%;
+  max-width: 500px;
   font-size: 1rem;
   background-color: var(--background-light);
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
@@ -169,59 +179,57 @@ h4 {
   margin: 0;
   width: 20px;
   height: 20px;
-} /* Adjust loader */
+}
 #member-select-container .error-message {
   margin: 0;
   padding: 0.25rem 0.5rem;
   font-size: 0.85rem;
 }
 
-/* --- Main Info Container (Card Style) --- */
+/* Main Info Card (Keep as before) */
 #member-info {
   background-color: var(--background-card);
   border-radius: var(--border-radius);
   box-shadow: var(--box-shadow);
   border: 1px solid var(--border-color);
-  overflow: hidden; /* Contain borders */
+  overflow: hidden;
   margin-top: 30px;
 }
 #member-info.hidden {
   display: none;
 }
 
-/* --- Tab Navigation --- */
+/* Tabs (Keep as before) */
 .tab-nav {
   display: flex;
-  background-color: transparent; /* Remove specific background */
+  background-color: transparent;
   border-bottom: 1px solid var(--border-color);
-  padding: 0 15px; /* Add some horizontal padding */
+  padding: 0 15px;
 }
 .tab-button {
-  padding: 1rem 1.25rem; /* More padding */
+  padding: 1rem 1.25rem;
   cursor: pointer;
   border: none;
   background-color: transparent;
   font-size: 1rem;
   font-weight: 500;
-  color: var(--text-muted); /* Inactive tabs are muted */
-  border-bottom: 3px solid transparent; /* Thicker indicator */
+  color: var(--text-muted);
+  border-bottom: 3px solid transparent;
   transition: color 0.2s ease, border-color 0.2s ease;
-  margin-bottom: -1px; /* Overlap border */
+  margin-bottom: -1px;
   white-space: nowrap;
 }
 .tab-button:hover {
-  color: var(--text-color); /* Darken on hover */
-  border-bottom-color: var(--border-color); /* Subtle hover indicator */
+  color: var(--text-color);
+  border-bottom-color: var(--border-color);
 }
 .tab-button.active {
-  color: var(--primary-color); /* Active tab uses primary color */
+  color: var(--primary-color);
   border-bottom-color: var(--primary-color);
-  font-weight: 600; /* Make active tab bolder */
+  font-weight: 600;
 }
-
-/* --- Tab Content Panes --- */
 .tab-content {
-  padding: 25px 30px; /* More padding */
+  padding: 25px 30px;
 }
 .tab-pane {
   display: none;
@@ -239,27 +247,26 @@ h4 {
   }
 }
 
-/* --- Specific Tab Content Styling --- */
-/* Details Tab */
+/* --- Details Tab Layout --- */
 #details-tab {
   display: flex;
   flex-wrap: wrap;
-  gap: 30px; /* More gap */
+  gap: 30px;
   align-items: flex-start;
 }
 
-/* --- *** IMAGE FIX *** --- */
+/* Photo Container (Keep circular style) */
 .member-photo-container {
-  flex-basis: 120px; /* Set desired size */
+  flex-basis: 120px;
   flex-shrink: 0;
   width: 120px;
   height: 120px;
-  border-radius: 50%; /* Make it circular */
-  overflow: hidden; /* Hide parts of image outside the circle */
-  border: 3px solid var(--background-card); /* Optional border inside */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow */
-  background-color: var(--background-light); /* Placeholder bg */
-  display: flex; /* Center placeholder/error text */
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid var(--background-card);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--background-light);
+  display: flex;
   align-items: center;
   justify-content: center;
 }
@@ -267,49 +274,59 @@ h4 {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover; /* Crop image to fit container, maintain aspect ratio */
-  object-position: center top; /* Try to keep top of head visible */
+  object-fit: cover;
+  object-position: center top;
 }
 #photo-loading-error {
   font-size: 0.8rem;
   text-align: center;
   padding: 5px;
-  color: var(--text-muted); /* Muted color for error text */
-  /* No background/border needed now */
+  color: var(--text-muted);
 }
-/* --- *** END IMAGE FIX *** --- */
 
+/* --- Details Content Re-Layout --- */
 #member-details-content {
   flex-grow: 1;
-  line-height: 1.7;
-  min-height: 120px; /* Match photo height */
-  display: flex;
-  flex-direction: column;
-  justify-content: center; /* Vertically center text if space allows */
+  min-height: 120px; /* Align roughly with photo */
+  display: grid; /* Use Grid for more control */
+  grid-template-columns: auto 1fr; /* Label column, Value column */
+  gap: 0.5em 1em; /* Row gap, Column gap */
+  align-items: baseline; /* Align text baselines */
 }
 #member-details-content.loading {
-  justify-content: flex-start;
-} /* Align loader top */
-#member-details-content strong {
+  display: block;
+  text-align: center;
+} /* Revert to block for loader */
+
+#member-details-content > strong {
+  /* Style labels */
+  grid-column: 1 / 2;
   color: var(--text-color);
   font-weight: 600;
-  margin-right: 5px;
+  text-align: right; /* Align labels right */
 }
-#member-details-content a {
+#member-details-content > span, /* Style values */
+#member-details-content > a {
+  grid-column: 2 / 3;
+  word-break: break-word; /* Allow long values to wrap */
+}
+#member-details-content > a {
   color: var(--primary-color);
   text-decoration: none;
-  margin-left: 5px;
   font-weight: 500;
 }
-#member-details-content a:hover {
+#member-details-content > a:hover {
   color: var(--primary-hover);
   text-decoration: underline;
 }
-#member-details-content br {
-  margin-bottom: 0.4em;
-} /* Add space after line breaks */
+/* Error message within details */
+#member-details-content > p.error-message {
+  grid-column: 1 / -1; /* Span both columns */
+  margin-top: 1em;
+}
+/* --- End Details Re-Layout --- */
 
-/* Legislation Lists */
+/* Legislation Lists (Keep as before) */
 #sponsored-items-list,
 #cosponsored-items-list {
   list-style: none;
@@ -318,7 +335,7 @@ h4 {
 }
 #sponsored-items-list li,
 #cosponsored-items-list li {
-  padding: 0.8rem 0.5rem; /* Use rem */
+  padding: 0.8rem 0.5rem;
   border-bottom: 1px solid var(--border-color);
   font-size: 0.95rem;
   line-height: 1.5;
@@ -327,7 +344,6 @@ h4 {
 #cosponsored-items-list li:last-child {
   border-bottom: none;
 }
-/* Style links within list items */
 #sponsored-items-list li a,
 #cosponsored-items-list li a {
   font-weight: 600;
@@ -340,30 +356,28 @@ h4 {
   color: var(--primary-hover);
   text-decoration: underline;
 }
-/* Muted text for dates/actions */
 #sponsored-items-list li > :not(a):not(strong),
 #cosponsored-items-list li > :not(a):not(strong) {
   color: var(--text-muted);
   font-size: 0.9em;
 }
 
-/* --- Loading Spinner and Error Styles --- */
+/* Loading Spinner (Keep as before) */
 .loader {
   border: 4px solid #f3f3f3;
-  border-top: 4px solid var(--primary-color); /* Use primary color */
+  border-top: 4px solid var(--primary-color);
   border-radius: 50%;
   width: 24px;
-  height: 24px; /* Slightly smaller */
+  height: 24px;
   animation: spin 0.8s linear infinite;
-  margin: 20px auto; /* Default centering */
-  display: none; /* Hidden by default */
+  margin: 20px auto;
+  display: none;
 }
-div.loading > .loader, /* Show in loading divs */
-#member-select-container .loader /* Also used by member select */ {
+div.loading > .loader,
+#member-select-container .loader {
   display: inline-block;
   vertical-align: middle;
 }
-
 @keyframes spin {
   0% {
     transform: rotate(0deg);
@@ -372,8 +386,6 @@ div.loading > .loader, /* Show in loading divs */
     transform: rotate(360deg);
   }
 }
-
-/* Fade content when loading */
 div.loading ul,
 div.loading #member-details-content > *:not(.loader):not(.error-message) {
   opacity: 0.5;
@@ -382,21 +394,19 @@ div.loading #member-details-content > *:not(.loader):not(.error-message) {
 div.loading .member-photo-container img {
   opacity: 0.5;
 }
-/* Center loader in list status divs */
 #sponsored-items-status.loading .loader,
 #cosponsored-items-status.loading .loader {
-  display: block; /* Center block */
+  display: block;
   margin: 30px auto;
 }
-/* Position loader within details content when loading */
 #member-details-content.loading .loader {
   display: block;
   margin: 30px auto;
   position: static;
-  transform: none; /* Reset absolute positioning */
+  transform: none;
 }
 
-/* Error Message Styling */
+/* Error Message (Keep as before) */
 .error-message {
   color: var(--danger-color);
   background-color: var(--danger-background);
@@ -412,7 +422,7 @@ div.loading .member-photo-container img {
   display: none;
 }
 
-/* --- Responsive Adjustments --- */
+/* Responsive Adjustments (Keep as before, grid handles some wrapping) */
 @media (max-width: 992px) {
   #filter-controls {
     gap: 20px;
@@ -421,7 +431,6 @@ div.loading .member-photo-container img {
     min-width: 300px;
   }
 }
-
 @media (max-width: 768px) {
   body {
     padding: 20px;
@@ -449,24 +458,30 @@ div.loading .member-photo-container img {
   #member-select {
     min-width: 100%;
     max-width: none;
-  } /* Full width */
+  }
   #details-tab {
     flex-direction: column;
     align-items: center;
     text-align: center;
-  } /* Center photo and text */
+  }
   .member-photo-container {
     margin-bottom: 20px;
   }
   #member-details-content {
+    display: block; /* Revert grid on small screens */
     text-align: center;
-    justify-content: flex-start;
     min-height: auto;
   }
+  #member-details-content > strong {
+    text-align: left;
+    display: inline-block;
+    width: auto;
+    margin-right: 5px;
+  } /* Adjust strong for non-grid */
   .tab-nav {
     padding: 0 10px;
     overflow-x: auto;
-  } /* Allow horizontal scroll on mobile */
+  }
   .tab-button {
     padding: 0.8rem 1rem;
     font-size: 0.95rem;
@@ -475,7 +490,6 @@ div.loading .member-photo-container img {
     padding: 20px;
   }
 }
-
 @media (max-width: 480px) {
   body {
     padding: 15px;
@@ -485,6 +499,13 @@ div.loading .member-photo-container img {
   }
   h2 {
     font-size: 1.3rem;
+    display: block;
+    text-align: center;
+  } /* Stack H2 and count */
+  .item-count {
+    display: inline-block;
+    margin-left: 5px;
+    margin-top: 5px;
   }
   #filter-controls,
   #member-selection-area {
@@ -495,7 +516,7 @@ div.loading .member-photo-container img {
     margin-left: -15px;
     margin-right: -15px;
     border-radius: 0;
-  } /* Full width */
+  }
   .tab-content {
     padding: 15px;
   }

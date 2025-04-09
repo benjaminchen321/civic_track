@@ -12,62 +12,17 @@
 
     <!-- Filter Controls (Keep as before) -->
     <div id="filter-controls">
-         <div class="filter-group">
-             <label for="congress-filter">Congress:</label>
-             <select id="congress-filter">
-                 {% for c in congresses %}
-                 <option value="{{ c.number }}" {% if c.number == current_congress %}selected{% endif %}>
-                     {{ c.number }} ({{ c.startYear or '?' }}-{{ c.endYear or 'Present' }})
-                 </option>
-                 {% else %}
-                 <option value="">No Congresses Loaded</option>
-                 {% endfor %}
-             </select>
-         </div>
-         <div class="filter-group">
-            <label for="name-search">Search by Name:</label>
-            <input type="text" id="name-search" placeholder="Enter name...">
-        </div>
-        <div class="filter-group">
-            <span class="filter-label">Filter by Party:</span>
-            <label><input type="radio" name="party-filter" value="ALL" checked> All</label>
-            <label><input type="radio" name="party-filter" value="D"> Dem</label>
-            <label><input type="radio" name="party-filter" value="R"> Rep</label>
-            <label><input type="radio" name="party-filter" value="ID"> Other</label>
-        </div>
-         <div class="filter-group">
-             <span class="filter-label">Filter by Chamber:</span>
-             <label><input type="radio" name="chamber-filter" value="ALL" checked> All</label>
-             {% for ch in chambers %}
-             {% if ch %}
-             <label><input type="radio" name="chamber-filter" value="{{ ch }}"> {{ ch }}</label>
-             {% endif %}
-             {% endfor %}
-         </div>
-         <div class="filter-group">
-             <label for="state-filter">Filter by State:</label>
-             <select id="state-filter">
-                 <option value="ALL">All States</option>
-                 {% for s_name in states %}
-                 <option value="{{ s_name }}">{{ s_name }}</option>
-                 {% endfor %}
-             </select>
-         </div>
+         <div class="filter-group"><label for="congress-filter">Congress:</label><select id="congress-filter">{% for c in congresses %}<option value="{{ c.number }}" {% if c.number == current_congress %}selected{% endif %}>{{ c.number }} ({{ c.startYear or '?' }}-{{ c.endYear or 'Present' }})</option>{% else %}<option value="">Err</option>{% endfor %}</select></div>
+         <div class="filter-group"><label for="name-search">Name:</label><input type="text" id="name-search" placeholder="Enter name..."></div>
+         <div class="filter-group"><span class="filter-label">Party:</span><label><input type="radio" name="party-filter" value="ALL" checked> All</label><label><input type="radio" name="party-filter" value="D"> Dem</label><label><input type="radio" name="party-filter" value="R"> Rep</label><label><input type="radio" name="party-filter" value="ID"> Other</label></div>
+         <div class="filter-group"><span class="filter-label">Chamber:</span><label><input type="radio" name="chamber-filter" value="ALL" checked> All</label>{% for ch in chambers %}{% if ch %}<label><input type="radio" name="chamber-filter" value="{{ ch }}"> {{ ch }}</label>{% endif %}{% endfor %}</div>
+         <div class="filter-group"><label for="state-filter">State:</label><select id="state-filter"><option value="ALL">All</option>{% for s_name in states %}<option value="{{ s_name }}">{{ s_name }}</option>{% endfor %}</select></div>
     </div>
 
     <!-- Member Selection (Keep as before) -->
-    <div id="member-selection-area">
-        <label for="member-select">Choose a Member:</label>
-        <div id="member-select-container">
-            <select name="members" id="member-select" disabled>
-               <option value="">-- Select Congress First --</option>
-            </select>
-            <span id="member-list-loader" class="loader"></span>
-            <span id="member-list-error" class="error-message"></span>
-         </div>
-     </div>
+    <div id="member-selection-area"><label for="member-select">Member:</label><div id="member-select-container"><select name="members" id="member-select" disabled><option value="">-- Select Congress --</option></select><span id="member-list-loader" class="loader"></span><span id="member-list-error" class="error-message"></span></div></div>
 
-    <!-- Member Info Display (Keep wrapper as before) -->
+    <!-- Member Info Display -->
     <div id="member-info" class="hidden">
         <div class="tab-nav">
             <button class="tab-button active" data-tab="details-tab">Details</button>
@@ -75,32 +30,30 @@
             <button class="tab-button" data-tab="cosponsored-tab">Cosponsored</button>
         </div>
         <div class="tab-content">
-
-            <!-- Details Tab -->
+            <!-- Details Tab (Keep structure as corrected before) -->
             <div id="details-tab" class="tab-pane active" aria-live="polite">
-                 <!-- Removed the #member-status wrapper -->
                  <h2>Member Details</h2>
-                 <!-- Photo and Details are now DIRECT children of #details-tab -->
                  <div class="member-photo-container">
                       <img id="member-photo" src="" alt="Member Photo" style="display: none;">
                       <span id="photo-loading-error" class="error-message"></span>
                  </div>
                  <div id="member-details-content">Select a member to view details.</div>
-                 <!-- End of direct children -->
             </div>
 
-            <!-- Sponsored Tab (Keep as before) -->
+            <!-- Sponsored Tab -->
             <div id="sponsored-tab" class="tab-pane">
-                 <h2>Recently Sponsored Legislation</h2>
+                 <!-- Add span for count -->
+                 <h2>Recently Sponsored <span class="item-count" id="sponsored-count"></span></h2>
                  <div id="sponsored-items-status" aria-live="polite">
                     <div class="loader"></div>
                     <ul id="sponsored-items-list"><li>Loading...</li></ul>
                  </div>
             </div>
 
-            <!-- Cosponsored Tab (Keep as before) -->
+            <!-- Cosponsored Tab -->
             <div id="cosponsored-tab" class="tab-pane">
-                 <h2>Recently Cosponsored Legislation</h2>
+                 <!-- Add span for count -->
+                 <h2>Recently Cosponsored <span class="item-count" id="cosponsored-count"></span></h2>
                  <div id="cosponsored-items-status" aria-live="polite">
                     <div class="loader"></div>
                     <ul id="cosponsored-items-list"><li>Loading...</li></ul>
@@ -110,10 +63,7 @@
     </div>
 
     <!-- Scripts (Keep as before) -->
-    <script>
-        let currentCongressMembers = [];
-        const initialCongress = {{ current_congress | tojson | safe }};
-    </script>
+    <script>let currentCongressMembers=[]; const initialCongress={{ current_congress | tojson | safe }};</script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

@@ -496,249 +496,164 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Function to update the display (Member Details) ---
   function updateDisplay(data) {
     console.log("Updating member display START");
-
-    // Ensure data is an object
     if (!data || typeof data !== "object") {
-      console.error("updateDisplay called with invalid data:", data);
-      // Optionally display a generic error
-      if (memberDetailsContainer)
-        displayError(
-          memberDetailsContainer,
-          null,
-          "Failed to process member data."
-        );
+      console.error("updateDisplay invalid data");
       return;
     }
 
     // --- Member Details & Photo Tab ---
-    const details = data.member_details; // Get details sub-object
+    const details = data.member_details;
     if (details && typeof details === "object" && memberDetailsContainer) {
+      // --- START: Generate HTML for Grid Layout ---
       let detailsHtml = "";
-      // Name
-      if (details.name)
-        detailsHtml += `<strong>Name:</strong> ${details.name}<br>`;
-      // State & Party
-      if (details.state || details.party) {
-        detailsHtml += `<strong>State:</strong> ${
-          details.state || "N/A"
-        } | <strong>Party:</strong> ${details.party || "N/A"}`;
-      }
-      // Chamber (using data from initial list load for consistency)
       const memberFromList = allMembersData.find(
         (m) => m.bioguide_id === details.bioguide_id
       );
-      if (memberFromList && memberFromList.chamber) {
-        detailsHtml += ` | <strong>Chamber:</strong> ${memberFromList.chamber}`;
-      } else if (
-        details.terms &&
-        Array.isArray(details.terms) &&
-        details.terms.length > 0
-      ) {
-        // Fallback: try to get from terms if available in details API (less reliable for *current* chamber)
-        const latestTerm = details.terms.sort(
-          (a, b) => (b.congress || 0) - (a.congress || 0)
-        )[0];
-        if (latestTerm && latestTerm.chamber)
-          detailsHtml += ` | <strong>Chamber:</strong> ${latestTerm.chamber}`;
+
+      if (details.name) {
+        detailsHtml += `<strong>Name:</strong><span>${details.name}</span>`;
       }
-
-      detailsHtml += "<br>"; // Line break after first line
-
-      // Birth Year
-      if (details.birth_year)
-        detailsHtml += `<strong>Birth Year:</strong> ${details.birth_year} `;
-      // Leadership Roles
+      if (details.state || details.party || memberFromList?.chamber) {
+        let infoLine = "";
+        if (details.state) infoLine += `${details.state}`;
+        if (details.party)
+          infoLine += `${infoLine ? " | " : ""}${details.party}`;
+        if (memberFromList?.chamber)
+          infoLine += `${infoLine ? " | " : ""}${memberFromList.chamber}`;
+        detailsHtml += `<strong>Info:</strong><span>${
+          infoLine || "N/A"
+        }</span>`;
+      }
+      if (details.birth_year) {
+        detailsHtml += `<strong>Birth Year:</strong><span>${details.birth_year}</span>`;
+      }
       if (
         details.leadership &&
         Array.isArray(details.leadership) &&
         details.leadership.length > 0
       ) {
-        detailsHtml += `<br><strong>Leadership:</strong> ${details.leadership
-          .map((l) => l?.type || "N/A")
-          .join(", ")}`;
+        detailsHtml += `<strong>Leadership:</strong><span>${details.leadership
+          .map((l) => l?.type || "?")
+          .join(", ")}</span>`;
       }
-      // Website Link
       if (details.website_url) {
         let safeUrl = details.website_url.trim();
-        // Basic check if it looks like a URL, add https if missing protocol
-        if (
-          safeUrl &&
-          !safeUrl.startsWith("http://") &&
-          !safeUrl.startsWith("https://")
-        ) {
+        if (safeUrl && !safeUrl.startsWith("http"))
           safeUrl = "https://" + safeUrl;
-        }
-        // Simple validation for potentially valid URL structure
         try {
-          new URL(safeUrl); // Test if it parses
-          detailsHtml += ` | <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Official Website</a>`;
+          new URL(safeUrl);
+          detailsHtml += `<strong>Website:</strong><a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Official Website</a>`;
         } catch (_) {
-          console.warn(
-            "Could not parse member website URL:",
-            details.website_url
-          );
-          // Optionally display the text without a link: detailsHtml += ` | Website: ${details.website_url}`;
+          detailsHtml += `<strong>Website:</strong><span>(Invalid URL)</span>`;
         }
       }
 
-      // Fallback if no details rendered
-      if (detailsHtml.trim().replace("<br>", "") === "") {
-        // Check if only <br> exists
-        detailsHtml = "<p>Member details not available.</p>";
+      // Add Term info if available (example)
+      // if (details.terms && details.terms.length > 0) {
+      //     const currentTerm = details.terms.sort((a,b) => b.congress - a.congress)[0];
+      //     if (currentTerm) {
+      //          detailsHtml += `<strong>Current Term:</strong><span>Congress ${currentTerm.congress} (${currentTerm.startYear}-${currentTerm.endYear || 'Present'})</span>`;
+      //     }
+      // }
+
+      if (detailsHtml.trim() === "") {
+        detailsHtml =
+          '<p class="error-message">Member details not available.</p>'; // Span full width
+        memberDetailsContainer.style.display = "block"; // Revert grid if only error
+      } else {
+        memberDetailsContainer.style.display = "grid"; // Ensure grid is applied
       }
 
-      // Append specific details error if it occurred
       if (data.member_details_error) {
-        detailsHtml += `<p class="error-message" style="margin-top:10px;">Details Error: ${data.member_details_error}</p>`;
+        detailsHtml += `<p class="error-message">${data.member_details_error}</p>`; // Span full width
+        memberDetailsContainer.style.display = "block"; // Revert grid if only error
       }
-      memberDetailsContainer.innerHTML = detailsHtml; // Set the generated HTML
+      memberDetailsContainer.innerHTML = detailsHtml;
+      // --- END: Generate HTML for Grid Layout ---
 
-      // Photo logic
+      // Photo logic (Keep as before)
       if (details.bioguide_id && memberPhoto && photoLoadingError) {
-        const photoUrl = `https://bioguide.congress.gov/bioguide/photo/${details.bioguide_id.charAt(
-          0
-        )}/${details.bioguide_id}.jpg`;
+        const photoUrl = `https://bioguide.congress.gov/bioguide/photo/${details.bioguide_id[0]}/${details.bioguide_id}.jpg`;
         memberPhoto.src = photoUrl;
-        memberPhoto.alt = `Photo of ${details.name || "member"}`; // Use name in alt text
-        memberPhoto.style.display = "block"; // Show image container
-        photoLoadingError.style.display = "none"; // Hide error message initially
-
+        memberPhoto.alt = `Photo of ${details.name || "member"}`;
+        memberPhoto.style.display = "block";
+        photoLoadingError.style.display = "none";
         memberPhoto.onerror = () => {
-          console.warn(`Failed to load photo: ${photoUrl}`);
-          memberPhoto.style.display = "none"; // Hide broken image
-          photoLoadingError.textContent = "Photo not found";
-          photoLoadingError.style.display = "block"; // Show error message
-          memberPhoto.onerror = null; // Prevent infinite loops if error itself fails
+          memberPhoto.style.display = "none";
+          photoLoadingError.textContent = "No photo";
+          photoLoadingError.style.display = "block";
+          memberPhoto.onerror = null;
         };
         memberPhoto.onload = () => {
-          // Photo loaded successfully
-          photoLoadingError.style.display = "none"; // Ensure error is hidden
-          memberPhoto.onerror = null; // Clear error handler
+          photoLoadingError.style.display = "none";
+          memberPhoto.onerror = null;
         };
       } else {
-        // No bioguide ID or photo elements missing
         if (memberPhoto) memberPhoto.style.display = "none";
         if (photoLoadingError) {
           photoLoadingError.textContent = details.bioguide_id
-            ? "Photo unavailable"
-            : "Photo ID missing";
+            ? "No photo"
+            : "ID missing";
           photoLoadingError.style.display = "block";
         }
       }
     } else {
-      // Handle case where member_details object is missing or container isn't found
-      const errorMsg =
-        data.member_details_error || "Member details could not be loaded.";
-      if (memberDetailsContainer) {
-        memberDetailsContainer.innerHTML = ""; // Clear first
-        displayError(memberDetailsContainer, null, errorMsg);
-      }
+      // Handle missing details
+      if (memberDetailsContainer)
+        displayError(
+          memberDetailsContainer,
+          null,
+          data.member_details_error || "Details unavailable."
+        );
       if (memberPhoto) memberPhoto.style.display = "none";
-      if (photoLoadingError) photoLoadingError.style.display = "none"; // Hide photo error if details failed
+      if (photoLoadingError) photoLoadingError.style.display = "none";
     }
     console.log("Member details & photo updated.");
 
-    // --- Sponsored Legislation Tab ---
-    console.log("Updating sponsored legislation...");
-    const sponsoredListElement = sponsoredItemsList;
-    const sponsoredStatusElement = sponsoredItemsStatus;
-    if (sponsoredListElement && sponsoredStatusElement) {
-      sponsoredListElement.innerHTML = ""; // Clear previous content
-      if (data.sponsored_items_error) {
-        displayError(
-          sponsoredStatusElement,
-          sponsoredListElement,
-          data.sponsored_items_error
-        );
-      } else if (
-        data.sponsored_items &&
-        Array.isArray(data.sponsored_items) &&
-        data.sponsored_items.length > 0
-      ) {
-        try {
-          data.sponsored_items.forEach((item) => {
-            if (item && typeof item === "object") {
-              // Check item validity
-              sponsoredListElement.appendChild(createLegislationListItem(item));
-            }
-          });
-          // Remove potential lingering error message if items were loaded
-          const existingError =
-            sponsoredStatusElement.querySelector(".error-message");
-          if (existingError) existingError.remove();
-        } catch (e) {
-          console.error("JS Error processing sponsored legislation:", e);
-          displayError(
-            sponsoredStatusElement,
-            sponsoredListElement,
-            "Error displaying sponsored items."
-          );
-        }
-      } else {
-        // No error, but no items
-        sponsoredListElement.innerHTML =
-          "<li>No recently sponsored legislation found for this member.</li>";
-        // Remove potential lingering error message
-        const existingError =
-          sponsoredStatusElement.querySelector(".error-message");
-        if (existingError) existingError.remove();
-      }
-    } else {
-      console.error("Sponsored legislation list or status element missing!");
-    }
-    console.log("Sponsored legislation updated.");
+    // --- Legislation Tabs ---
+    // Update counts
+    const sponsoredCountSpan = document.getElementById("sponsored-count");
+    const cosponsoredCountSpan = document.getElementById("cosponsored-count");
+    if (sponsoredCountSpan)
+      sponsoredCountSpan.textContent =
+        data.sponsored_count !== undefined ? `(${data.sponsored_count})` : "";
+    if (cosponsoredCountSpan)
+      cosponsoredCountSpan.textContent =
+        data.cosponsored_count !== undefined
+          ? `(${data.cosponsored_count})`
+          : "";
 
-    // --- Cosponsored Legislation Tab ---
-    console.log("Updating cosponsored legislation...");
-    const cosponsoredListElement = cosponsoredItemsList;
-    const cosponsoredStatusElement = cosponsoredItemsStatus;
-    if (cosponsoredListElement && cosponsoredStatusElement) {
-      cosponsoredListElement.innerHTML = ""; // Clear previous content
-      if (data.cosponsored_items_error) {
-        displayError(
-          cosponsoredStatusElement,
-          cosponsoredListElement,
-          data.cosponsored_items_error
-        );
-      } else if (
-        data.cosponsored_items &&
-        Array.isArray(data.cosponsored_items) &&
-        data.cosponsored_items.length > 0
-      ) {
-        try {
-          data.cosponsored_items.forEach((item) => {
-            if (item && typeof item === "object") {
-              // Check item validity
-              cosponsoredListElement.appendChild(
-                createLegislationListItem(item)
-              );
+    // Update lists (Keep as before)
+    [sponsoredItemsStatus, cosponsoredItemsStatus].forEach(
+      (statusEl, index) => {
+        const listEl = index === 0 ? sponsoredItemsList : cosponsoredItemsList;
+        const items =
+          index === 0 ? data.sponsored_items : data.cosponsored_items;
+        const error =
+          index === 0
+            ? data.sponsored_items_error
+            : data.cosponsored_items_error;
+        const type = index === 0 ? "sponsored" : "cosponsored";
+        if (listEl && statusEl) {
+          listEl.innerHTML = "";
+          statusEl.querySelector(".error-message")?.remove();
+          if (error) {
+            displayError(statusEl, listEl, error);
+          } else if (items?.length > 0) {
+            try {
+              items.forEach((item) => {
+                if (item) listEl.appendChild(createLegislationListItem(item));
+              });
+            } catch (e) {
+              displayError(statusEl, listEl, `Err displaying ${type}.`);
             }
-          });
-          const existingError =
-            cosponsoredStatusElement.querySelector(".error-message");
-          if (existingError) existingError.remove();
-        } catch (e) {
-          console.error("JS Error processing cosponsored legislation:", e);
-          displayError(
-            cosponsoredStatusElement,
-            cosponsoredListElement,
-            "Error displaying cosponsored items."
-          );
+          } else {
+            listEl.innerHTML = `<li>No recent ${type} legislation found.</li>`;
+          }
         }
-      } else {
-        // No error, but no items
-        cosponsoredListElement.innerHTML =
-          "<li>No recently cosponsored legislation found for this member.</li>";
-        const existingError =
-          cosponsoredStatusElement.querySelector(".error-message");
-        if (existingError) existingError.remove();
       }
-    } else {
-      console.error("Cosponsored legislation list or status element missing!");
-    }
-    console.log("Cosponsored legislation updated.");
-
-    console.log("Updating member display END");
+    );
+    console.log("Display update END");
   }
 
   // --- Function to clear the display ---

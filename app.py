@@ -2,9 +2,10 @@
 import os
 import json
 import requests
+from collections import Counter
 from flask import Flask, jsonify, render_template, request
 from flask_caching import Cache
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
 
 app = Flask(__name__)
 
@@ -23,8 +24,8 @@ if not CONGRESS_GOV_API_KEY:
     print("CRITICAL WARNING: CONGRESS_GOV_API_KEY env var missing.")
 API_BASE_URL = "https://api.congress.gov/v3"
 
-# Amendment Types (lowercase, as parsed from URL)
 AMENDMENT_TYPES = {"samdt", "hamdt", "sa", "ha"}
+BILL_TYPES = {"hr", "s", "hres", "sres", "hjres", "sjres", "hconres", "sconres"}
 
 
 # --- Generic API Helper (No changes) ---
@@ -81,6 +82,234 @@ def _make_api_request(endpoint, params=None, timeout=15):
 
 
 # --- Helper Functions ---
+@cache.memoize(timeout=86400)  # Cache Bill details for a day
+def get_bill_details(congress, bill_type, bill_number):
+    """Fetches comprehensive details for a specific bill."""
+    print(f"Fetching details for Bill: {congress}-{bill_type}-{bill_number}")
+    base_endpoint = f"/bill/{congress}/{bill_type.lower()}/{bill_number}"
+    details = {"error": None}
+
+    # 1. Get Base Bill Info
+    base_data, error = _make_api_request(base_endpoint)
+    if error or not base_data or "bill" not in base_data:
+        details["error"] = error or "Bill base data not found or invalid format."
+        print(
+            f"Error fetching base details for {congress}-{bill_type}-{bill_number}: {details['error']}"
+        )
+        return details  # Return early if base info fails
+
+    bill_data = base_data["bill"]
+    details.update(bill_data)  # Add all base fields
+
+    # 2. Fetch Sub-details (Actions, Cosponsors count, Subjects, Laws)
+    # We only fetch counts/URLs included in the base endpoint for performance now
+    # Fetching full lists would happen if user navigates to a dedicated bill page
+    # Example: Get cosponsor count directly if available
+    details["cosponsors_count"] = bill_data.get("cosponsors", {}).get("count", 0)
+    details["actions_count"] = bill_data.get("actions", {}).get("count", 0)
+    details["summaries_count"] = bill_data.get("summaries", {}).get("count", 0)
+    # Keep 'laws' and 'subjects' as they are (often included directly)
+
+    return details
+
+
+@cache.memoize(timeout=86400)  # Cache Amendment details for a day
+def get_amendment_details(congress, amendment_type, amendment_number):
+    """Fetches comprehensive details for a specific amendment."""
+    print(
+        f"Fetching details for Amendment: {congress}-{amendment_type}-{amendment_number}"
+    )
+    base_endpoint = f"/amendment/{congress}/{amendment_type.lower()}/{amendment_number}"
+    details = {"error": None}
+
+    # 1. Get Base Amendment Info
+    base_data, error = _make_api_request(base_endpoint)
+    if error or not base_data or "amendment" not in base_data:
+        details["error"] = error or "Amendment base data not found or invalid format."
+        print(
+            f"Error fetching base details for {congress}-{amendment_type}-{amendment_number}: {details['error']}"
+        )
+        return details
+
+    amendment_data = base_data["amendment"]
+    details.update(amendment_data)
+
+    # 2. Fetch Sub-details if needed (e.g., cosponsors count, actions)
+    details["cosponsors_count"] = amendment_data.get("cosponsors", {}).get("count", 0)
+    details["actions_count"] = amendment_data.get("actions", {}).get("count", 0)
+
+    return details
+
+
+# --- Modified _parse_legislation_item ---
+# Now focuses only on IDENTIFICATION based on list data, not fetching details here.
+# Detailed fetching happens later in get_sponsored/cosponsored functions.
+def _identify_legislation_item(item):
+    """Helper to IDENTIFY item type, number, congress from list data."""
+    if not isinstance(item, dict):
+        return None
+
+    amendment_num = item.get("amendmentNumber")
+    bill_num = item.get("number")
+    original_type = item.get("type")  # Can be "None" string
+    congress = item.get("congress")
+    url = item.get("url")
+
+    if not congress:
+        return None  # Need congress number
+
+    item_identity = {
+        "item_type": None,
+        "number": None,
+        "type": None,
+        "congress": congress,
+        "list_item_data": item,
+    }
+
+    if amendment_num is not None:
+        item_identity["item_type"] = "Amendment"
+        item_identity["number"] = amendment_num
+        # Try to determine type code from URL, essential for fetching details
+        parsed_type = None
+        if url:
+            try:
+                path_segments = urlparse(url).path.strip("/").split("/")
+                if len(path_segments) >= 5 and path_segments[1] == "amendment":
+                    type_code = path_segments[-2].lower()
+                    if type_code in AMENDMENT_TYPES:
+                        parsed_type = type_code.upper()
+            except:
+                pass  # Ignore URL parsing errors
+        item_identity["type"] = parsed_type  # Might be None if URL parse fails
+
+    elif bill_num is not None and original_type and original_type != "None":
+        type_code_lower = original_type.lower()
+        if type_code_lower in BILL_TYPES:  # Check if it's a known bill type
+            item_identity["item_type"] = "Bill"
+            item_identity["number"] = bill_num
+            item_identity["type"] = original_type.upper()  # Store original type code
+        else:
+            print(
+                f"Warn: Item has number/type but type '{original_type}' not in known BILL_TYPES (skipping): {item}"
+            )
+            return None
+    else:
+        print(f"Warn: Could not identify item structure (skipping): {item}")
+        return None  # Cannot identify
+
+    # Final check: need type code to fetch details later
+    if not item_identity["type"]:
+        print(
+            f"Warn: Could not determine type code for {item_identity['item_type']} #{item_identity['number']} (skipping)"
+        )
+        return None
+
+    return item_identity
+
+
+@cache.memoize(timeout=1800)  # Cache the *list* of detailed items
+def get_detailed_sponsored_legislation(bioguide_id):
+    """Fetches list and then gets full details for each sponsored item."""
+    endpoint = f"/member/{bioguide_id}/sponsored-legislation"
+    params = {"limit": 15}  # Limit initial list fetch
+    list_data, error = _make_api_request(endpoint, params=params)
+    detailed_items = []
+    item_list = None
+
+    if error:
+        return {"items": [], "error": error}  # Return error if list fetch fails
+
+    if list_data:
+        for key in ["sponsoredLegislation", "legislation", "items"]:
+            if key in list_data and isinstance(list_data.get(key), list):
+                item_list = list_data[key]
+                break
+
+    if item_list:
+        print(
+            f"Fetching details for {len(item_list)} sponsored items for {bioguide_id}..."
+        )
+        for item in item_list:
+            identity = _identify_legislation_item(item)
+            if not identity:
+                continue  # Skip if cannot identify
+
+            details = None
+            if identity["item_type"] == "Bill":
+                details = get_bill_details(
+                    identity["congress"], identity["type"], identity["number"]
+                )
+            elif identity["item_type"] == "Amendment":
+                details = get_amendment_details(
+                    identity["congress"], identity["type"], identity["number"]
+                )
+
+            if details and not details.get("error"):
+                # Add the basic item_type info for frontend convenience
+                details["item_type"] = identity["item_type"]
+                detailed_items.append(details)
+            else:
+                # Log error but continue processing others
+                print(
+                    f"Warn: Failed to fetch details for {identity['item_type']} {identity['congress']}-{identity['type']}-{identity['number']}: {details.get('error') if details else 'Unknown error'}"
+                )
+                # Optionally add placeholder with error? For now, skip failed items.
+    else:
+        print(f"No sponsored items list found/key mismatch for {bioguide_id}.")
+
+    return {"items": detailed_items, "error": None}  # Return list of detailed items
+
+
+@cache.memoize(timeout=1800)  # Cache the *list* of detailed items
+def get_detailed_cosponsored_legislation(bioguide_id):
+    """Fetches list and then gets full details for each cosponsored item."""
+    endpoint = f"/member/{bioguide_id}/cosponsored-legislation"
+    params = {"limit": 15}
+    list_data, error = _make_api_request(endpoint, params=params)
+    detailed_items = []
+    item_list = None
+
+    if error:
+        return {"items": [], "error": error}
+
+    if list_data:
+        for key in ["cosponsoredLegislation", "legislation", "items"]:
+            if key in list_data and isinstance(list_data.get(key), list):
+                item_list = list_data[key]
+                break
+
+    if item_list:
+        print(
+            f"Fetching details for {len(item_list)} cosponsored items for {bioguide_id}..."
+        )
+        for item in item_list:
+            identity = _identify_legislation_item(item)
+            if not identity:
+                continue
+
+            details = None
+            if identity["item_type"] == "Bill":
+                details = get_bill_details(
+                    identity["congress"], identity["type"], identity["number"]
+                )
+            elif identity["item_type"] == "Amendment":
+                details = get_amendment_details(
+                    identity["congress"], identity["type"], identity["number"]
+                )
+
+            if details and not details.get("error"):
+                details["item_type"] = identity["item_type"]  # Add item_type
+                detailed_items.append(details)
+            else:
+                print(
+                    f"Warn: Failed to fetch details for {identity['item_type']} {identity['congress']}-{identity['type']}-{identity['number']}: {details.get('error') if details else 'Unknown error'}"
+                )
+    else:
+        print(f"No cosponsored items list found/key mismatch for {bioguide_id}.")
+
+    return {"items": detailed_items, "error": None}
+
+
 @cache.memoize(timeout=43200)
 def load_congress_members(congress_num=None):
     """Loads member list, optionally filtered by Congress."""
@@ -453,9 +682,15 @@ def get_member_data(bioguide_id):
     if not bioguide_id or len(bioguide_id) != 7:
         return jsonify({"error": "Invalid member ID."}), 400
     print(f"API call for member: {bioguide_id}")
+
     details_data = get_member_details(bioguide_id)
     sponsored_data = get_sponsored_legislation(bioguide_id)
     cosponsored_data = get_cosponsored_legislation(bioguide_id)
+
+    # Calculate counts from the fetched lists
+    sponsored_count = len(sponsored_data.get("items", []))
+    cosponsored_count = len(cosponsored_data.get("items", []))
+
     combined = {
         "error": None,
         "member_details": details_data.get("details"),
@@ -464,11 +699,14 @@ def get_member_data(bioguide_id):
         "committees_error": "Not implemented.",
         "sponsored_items": sponsored_data.get("items", []),
         "sponsored_items_error": sponsored_data.get("error"),
+        "sponsored_count": sponsored_count,  # <-- Add count
         "cosponsored_items": cosponsored_data.get("items", []),
         "cosponsored_items_error": cosponsored_data.get("error"),
+        "cosponsored_count": cosponsored_count,  # <-- Add count
         "votes": [],
         "votes_error": "Not implemented.",
     }
+
     details_err = details_data.get("error")
     status = (
         404
