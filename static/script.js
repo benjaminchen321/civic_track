@@ -1,7 +1,9 @@
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("DOM Loaded. Initializing script...");
+// FILE: static/script.js
+// ... (Keep references, other helpers, fetch functions etc. as before) ...
 
-  // --- Get references ---
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM Loaded.");
+  // --- References ---
   const memberSelect = document.getElementById("member-select");
   const memberListLoader = document.getElementById("member-list-loader");
   const memberListError = document.getElementById("member-list-error");
@@ -17,9 +19,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabPanes = document.querySelectorAll(".tab-pane");
   const memberPhoto = document.getElementById("member-photo");
   const photoLoadingError = document.getElementById("photo-loading-error");
-  const memberDetailsContainer = document.getElementById(
-    "member-details-content"
+  const memberDetailsCoreContainer = document.getElementById(
+    "member-details-core"
+  ); // Corrected name
+  const termHistoryList = document.getElementById("term-history-list");
+  const partyHistoryList = document.getElementById("party-history-list");
+  const leadershipHistoryList = document.getElementById(
+    "leadership-history-list"
   );
+  const photoAttribution = document.getElementById("photo-attribution");
   const sponsoredItemsList = document.getElementById("sponsored-items-list");
   const sponsoredItemsStatus = document.getElementById(
     "sponsored-items-status"
@@ -31,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "cosponsored-items-status"
   );
 
-  // --- Global Variables & Constants ---
+  // --- Globals and Constants ---
   let currentFilters = {
     congress: initialCongress || null,
     name: "",
@@ -40,460 +48,286 @@ document.addEventListener("DOMContentLoaded", () => {
     chamber: "ALL",
   };
   let allMembersData = [];
-
-  // --- START: Updated billTypePaths with Amendment types ---
   const billTypePaths = {
-    // Bills
     HR: "house-bill",
     S: "senate-bill",
-    // Resolutions
     HRES: "house-resolution",
     SRES: "senate-resolution",
     HJRES: "house-joint-resolution",
     SJRES: "senate-joint-resolution",
     HCONRES: "house-concurrent-resolution",
     SCONRES: "senate-concurrent-resolution",
-    // Amendments (Verify paths on congress.gov if possible)
-    SAMDT: "senate-amendment", // Official Senate Amendment
-    HAMDT: "house-amendment", // Official House Amendment
-    SA: "senate-amendment", // Simple Senate Amendment (might map to same place)
-    HA: "house-amendment", // Simple House Amendment (might map to same place)
-    // Add others like SCONRESAMDT if needed
+    SAMDT: "senate-amendment",
+    HAMDT: "house-amendment",
+    SA: "senate-amendment",
+    HA: "house-amendment",
   };
-  // --- END: Updated billTypePaths ---
 
-  // --- Helper functions ---
+  // --- Helper Functions (Keep createLegislationListItem, displayError, switchTab as before) ---
   function createLegislationListItem(item) {
-    const listItem = document.createElement("li");
-    let itemElement = document.createElement("span");
-    itemElement.textContent = "N/A";
-    const itemTitle = item.title || "No Title Available";
-    const congressNum = item.congress;
-    const itemTypeCode = item.type; // Use the actual type code from backend (e.g., S, HR, SAMDT, SA)
-    const itemNum = item.number;
-
-    if (!item || typeof item !== "object") return listItem; // Return empty li if item invalid
-
-    // --- Logic using item.item_type set by backend ---
-    if (
-      item.item_type === "Bill" &&
-      congressNum &&
-      itemTypeCode &&
-      itemNum !== null
-    ) {
-      let itemDisplayNum = `${itemTypeCode}${itemNum}`;
-      const urlPathSegment = billTypePaths[itemTypeCode]; // Look up path using Type Code
-      if (urlPathSegment) {
-        const url = `https://www.congress.gov/bill/${congressNum}th-congress/${urlPathSegment}/${itemNum}`;
-        itemElement = document.createElement("a");
-        itemElement.href = url;
-        itemElement.target = "_blank";
-        itemElement.rel = "noopener noreferrer";
-        itemElement.textContent = itemDisplayNum;
+    const li = document.createElement("li");
+    let el = document.createElement("span");
+    el.textContent = "N/A";
+    const title = item.title || "No Title";
+    const cong = item.congress;
+    const typeCode = item.type;
+    const num = item.number;
+    if (!item) return li;
+    if (item.item_type === "Bill" && cong && typeCode && num !== null) {
+      let disp = `${typeCode}${num}`;
+      const path = billTypePaths[typeCode];
+      if (path) {
+        const url = `https://www.congress.gov/bill/${cong}th-congress/${path}/${num}`;
+        el = document.createElement("a");
+        el.href = url;
+        el.target = "_blank";
+        el.rel = "noopener noreferrer";
+        el.textContent = disp;
       } else {
-        console.warn(`No URL path found for Bill type: ${itemTypeCode}`);
-        itemElement.textContent = itemDisplayNum; // Show text even without link
+        el.textContent = disp;
       }
     } else if (
       item.item_type === "Amendment" &&
-      congressNum &&
-      itemTypeCode &&
-      itemNum !== null
+      cong &&
+      typeCode &&
+      num !== null
     ) {
-      // Display text like "SA 123" or "HAMDT 456" based on type code
-      let itemDisplayNum = `${itemTypeCode} ${itemNum}`;
-      const urlPathSegment = billTypePaths[itemTypeCode]; // Look up path using Type Code (SA, SAMDT etc.)
-      if (urlPathSegment) {
-        // Construct Amendment URL (Using structure consistent with billTypePaths)
-        const url = `https://www.congress.gov/amendment/${congressNum}th-congress/${urlPathSegment}/${itemNum}`;
-        itemElement = document.createElement("a");
-        itemElement.href = url;
-        itemElement.target = "_blank";
-        itemElement.rel = "noopener noreferrer";
-        itemElement.textContent = itemDisplayNum; // Display "SA 123" as link text
+      let disp = `${typeCode} ${num}`;
+      const path = billTypePaths[typeCode];
+      if (path) {
+        const url = `https://www.congress.gov/amendment/${cong}th-congress/${path}/${num}`;
+        el = document.createElement("a");
+        el.href = url;
+        el.target = "_blank";
+        el.rel = "noopener noreferrer";
+        el.textContent = disp;
       } else {
-        console.warn(`No URL path found for Amendment type: ${itemTypeCode}`);
-        itemElement.textContent = itemDisplayNum; // Show text even without link
+        el.textContent = disp;
       }
     } else {
-      // Fallback if item_type wasn't set or data missing
-      itemElement.textContent = `Item: ${itemTypeCode || "?"}${itemNum || "?"}`;
-      console.warn("Could not classify or link item:", item);
+      el.textContent = `Item: ${typeCode || "?"}${num || "?"}`;
+      console.warn("Cannot classify:", item);
     }
-    // --- End logic ---
-
-    listItem.appendChild(itemElement);
-    listItem.appendChild(document.createTextNode(`: ${itemTitle} `));
+    li.appendChild(el);
+    li.appendChild(document.createTextNode(`: ${title} `));
     if (item.introduced_date) {
-      listItem.appendChild(
-        document.createTextNode(`(Introduced: ${item.introduced_date}) `)
+      li.appendChild(
+        document.createTextNode(`(Intro: ${item.introduced_date}) `)
       );
     }
     if (item.latest_action_text && item.latest_action_text !== "N/A") {
-      listItem.appendChild(
+      li.appendChild(
         document.createTextNode(
-          `(Latest Action: ${item.latest_action_text} on ${
+          `(Action: ${item.latest_action_text} on ${
             item.latest_action_date || "N/A"
           })`
         )
       );
     } else if (item.introduced_date) {
-      listItem.appendChild(document.createTextNode(`(No recent action)`));
-    } // Show only if intro date exists
-    return listItem;
+      li.appendChild(document.createTextNode(`(No recent action)`));
+    }
+    return li;
   }
-
-  function displayError(statusElement, listElement, message) {
-    if (!statusElement) {
-      console.error("Cannot display error, status element is missing.");
-      return;
+  function displayError(el, listEl, msg) {
+    if (!el) return;
+    el.classList.remove("loading");
+    el.querySelector(".loader")?.remove();
+    if (listEl) listEl.innerHTML = "";
+    let errP = el.querySelector(".error-message");
+    if (!errP) {
+      errP = document.createElement("p");
+      errP.className = "error-message";
+      el.prepend(errP);
     }
-    // Ensure loading spinner is hidden
-    statusElement.classList.remove("loading");
-    const loader = statusElement.querySelector(".loader");
-    if (loader) loader.style.display = "none";
-
-    // Clear existing list content if listElement provided
-    if (listElement) listElement.innerHTML = "";
-
-    // Add or update error message
-    let errorPara = statusElement.querySelector(".error-message");
-    if (!errorPara) {
-      errorPara = document.createElement("p");
-      errorPara.className = "error-message";
-      // Prepend error message so it appears before potential empty list styling
-      statusElement.prepend(errorPara);
-    }
-    errorPara.textContent = message || "An error occurred. Please try again.";
-    errorPara.style.display = "block"; // Ensure it's visible
+    errP.textContent = msg || "Error.";
+    errP.style.display = "block";
   }
-
-  function switchTab(selectedButton) {
-    if (!selectedButton || !tabButtons || !tabPanes) {
-      console.warn("Tab switching elements missing.");
-      return;
-    }
+  function switchTab(btn) {
+    if (!btn || !tabButtons || !tabPanes) return;
     tabButtons.forEach((b) => b.classList.remove("active"));
     tabPanes.forEach((p) => p.classList.remove("active"));
-
-    selectedButton.classList.add("active");
-    const targetId = selectedButton.getAttribute("data-tab");
+    btn.classList.add("active");
+    const targetId = btn.getAttribute("data-tab");
     const targetPane = document.getElementById(targetId);
-
-    if (targetPane) {
-      targetPane.classList.add("active");
-      console.log(`Switched to tab: ${targetId}`);
-    } else {
-      console.error(`Tab pane with ID '${targetId}' not found.`);
-      // Optionally activate the first tab as a fallback
-      if (tabPanes.length > 0) tabPanes[0].classList.add("active");
-      if (tabButtons.length > 0) tabButtons[0].classList.add("active");
+    if (targetPane) targetPane.classList.add("active");
+    else {
+      tabButtons[0]?.classList.add("active");
+      tabPanes[0]?.classList.add("active");
     }
   }
 
-  // --- Function to Fetch Member List for a Congress ---
-  async function fetchCongressMembers(congressNumber) {
-    console.log(`Fetching members for Congress ${congressNumber}...`);
-    if (!memberSelect || !memberListLoader || !memberListError) {
-      console.error("Member selection elements missing, cannot fetch members.");
-      return;
-    }
-
-    memberSelect.disabled = true; // Disable dropdown while loading
-    memberListLoader.style.display = "inline-block"; // Show loader
-    memberListError.style.display = "none"; // Hide error
-    memberSelect.innerHTML = '<option value="">-- Loading Members --</option>'; // Update placeholder
-    allMembersData = []; // Clear previous congress data
-
+  // --- Fetch Functions (Keep fetchCongressMembers, populateMemberDropdown, fetchMemberDetailData as before) ---
+  async function fetchCongressMembers(num) {
+    /* ... */ console.log(`Fetching members ${num}...`);
+    if (!memberSelect || !memberListLoader || !memberListError) return;
+    memberSelect.disabled = true;
+    memberListLoader.style.display = "inline-block";
+    memberListError.style.display = "none";
+    memberSelect.innerHTML = '<option value="">-- Loading --</option>';
+    allMembersData = [];
     try {
-      // Use the new API endpoint
-      const response = await fetch(`/api/members?congress=${congressNumber}`);
-      if (!response.ok) {
-        let errorMsg = `Error fetching members: ${response.status} ${response.statusText}`;
+      const r = await fetch(`/api/members?congress=${num}`);
+      if (!r.ok) {
+        let msg = `Err: ${r.status}`;
         try {
-          // Try to parse more specific error from backend JSON response
-          const errorData = await response.json();
-          errorMsg = errorData.error || errorMsg; // Use backend error message if available
-        } catch (e) {
-          // Ignore if response body isn't JSON or is empty
-          console.log("Could not parse error response as JSON.");
-        }
-        throw new Error(errorMsg);
+          const d = await r.json();
+          msg = d.error || msg;
+        } catch (e) {}
+        throw new Error(msg);
       }
-      const members = await response.json();
-
-      // Validate the received data
-      if (!Array.isArray(members)) {
-        throw new Error(
-          "Invalid data format received for members (expected an array)."
-        );
-      }
-
-      allMembersData = members; // Store the fetched members globally
-      console.log(`allMembersData:`, allMembersData);
-      console.log(
-        `Successfully fetched ${allMembersData.length} members for Congress ${congressNumber}.`
-      );
-      memberListLoader.style.display = "none"; // Hide loader on success
-      populateMemberDropdown(); // Populate dropdown with the new data
-    } catch (error) {
-      console.error("Failed to fetch congress members:", error);
-      memberListLoader.style.display = "none"; // Hide loader on error
-      memberListError.textContent = `Error loading members: ${error.message}`;
-      memberListError.style.display = "inline-block"; // Show error message
-      memberSelect.innerHTML =
-        '<option value="">-- Error Loading Members --</option>';
-      allMembersData = []; // Ensure data is empty on error
-      memberSelect.disabled = true; // Keep disabled on error
+      const members = await r.json();
+      if (!Array.isArray(members)) throw new Error("Bad format.");
+      allMembersData = members;
+      console.log(`Fetched ${allMembersData.length}.`);
+      memberListLoader.style.display = "none";
+      populateMemberDropdown();
+    } catch (err) {
+      console.error("Fetch members err:", err);
+      memberListLoader.style.display = "none";
+      memberListError.textContent = `Err: ${err.message}`;
+      memberListError.style.display = "inline-block";
+      memberSelect.innerHTML = '<option value="">-- Error --</option>';
+      allMembersData = [];
+      memberSelect.disabled = true;
     }
   }
-
-  // --- Function to Populate Dropdown (Uses global allMembersData) ---
   function populateMemberDropdown() {
-    if (!memberSelect || !memberListError) {
-      console.error(
-        "Member select or error element missing, cannot populate dropdown."
-      );
+    /* ... */ if (!memberSelect || !memberListError) return;
+    memberListError.style.display = "none";
+    memberSelect.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "-- Choose --";
+    memberSelect.appendChild(opt);
+    if (!allMembersData?.length) {
+      opt.textContent = "-- None --";
+      memberSelect.disabled = true;
       return;
     }
-
-    memberListError.style.display = "none"; // Hide error message when populating
-    memberSelect.innerHTML = ""; // Clear existing options first
-
-    const defaultOption = document.createElement("option");
-    defaultOption.value = "";
-    defaultOption.textContent = "-- Choose Member --";
-    memberSelect.appendChild(defaultOption);
-
-    // Check if the global allMembersData (for the current congress) is available
-    if (!Array.isArray(allMembersData) || allMembersData.length === 0) {
-      // This case might happen if fetch failed or returned empty
-      defaultOption.textContent =
-        "-- No members available for this Congress --";
-      memberSelect.disabled = true; // Ensure disabled if no data
-      console.warn("populateMemberDropdown called with no member data.");
-      return;
-    }
-
-    // Enable select now that we have data (or will filter existing)
     memberSelect.disabled = false;
-
-    // Apply local filters (name, party, state, chamber) to the current congress's members
-    const nameFilter = currentFilters.name.toLowerCase().trim();
-    const partyFilter = currentFilters.party;
-    const stateFilter = currentFilters.state;
-    const chamberFilter = currentFilters.chamber;
-
+    const nF = currentFilters.name.toLowerCase().trim();
+    const pF = currentFilters.party;
+    const sF = currentFilters.state;
+    const cF = currentFilters.chamber;
     console.log(
-      `Filtering ${allMembersData.length} members (Congress ${currentFilters.congress}) with Party=${partyFilter}, Chamber=${chamberFilter}, State=${stateFilter}, Name=${nameFilter}`
+      `Filtering ${allMembersData.length} C=${currentFilters.congress} P=${pF}, Ch=${cF}, St=${sF}, N=${nF}`
     );
-
-    let membersPassedCount = 0;
-    const filteredMembers = allMembersData // Filter the globally stored list
-      .filter((member) => {
-        // Basic validation of member object
-        if (!member || typeof member !== "object") return false;
-
-        // Name Match (case-insensitive)
-        const nameMatch =
-          !nameFilter ||
-          (member.name &&
-            typeof member.name === "string" &&
-            member.name.toLowerCase().includes(nameFilter));
-
-        // State Match
-        const stateMatch =
-          stateFilter === "ALL" || member.state === stateFilter;
-
-        // Chamber Match (case-insensitive)
-        const chamberMatch =
-          chamberFilter === "ALL" ||
-          (member.chamber &&
-            typeof member.chamber === "string" &&
-            member.chamber.toUpperCase() === chamberFilter.toUpperCase());
-
-        // Party Match
-        const partyCode = member.party_code || ""; // Use party_code generated in backend
-        let partyMatch = partyFilter === "ALL";
-        if (!partyMatch) {
-          if (partyFilter === "ID") {
-            // Independents/Other
-            partyMatch = partyCode !== "D" && partyCode !== "R";
-          } else {
-            // Specific party (D or R)
-            partyMatch = partyCode === partyFilter;
-          }
-        }
-
-        // Check if all filters pass
-        const passesAll = nameMatch && stateMatch && partyMatch && chamberMatch;
-        if (passesAll) {
-          membersPassedCount++;
-        }
-        return passesAll;
+    let count = 0;
+    const filt = allMembersData
+      .filter((m) => {
+        if (!m) return false;
+        const nm = !nF || (m.name && m.name.toLowerCase().includes(nF));
+        const sm = sF === "ALL" || m.state === sF;
+        const chm =
+          cF === "ALL" ||
+          (m.chamber && m.chamber.toUpperCase() === cF.toUpperCase());
+        const pc = m.party_code || "";
+        let pm =
+          pF === "ALL" || (pF === "ID" ? pc !== "D" && pc !== "R" : pc === pF);
+        const pass = nm && sm && pm && chm;
+        if (pass) count++;
+        return pass;
       })
-      .sort((a, b) => {
-        // Sort alphabetically by name, handling potential nulls
-        const nameA = a.name || "";
-        const nameB = b.name || "";
-        return nameA.localeCompare(nameB);
-      });
-
-    console.log(`Total members passed filters: ${membersPassedCount}`);
-
-    if (filteredMembers.length === 0) {
-      defaultOption.textContent = "-- No members match filters --";
-    } else {
-      defaultOption.textContent = `-- Select from ${filteredMembers.length} members --`;
-    }
-
-    filteredMembers.forEach((member) => {
-      // Check for essential properties before creating option
-      if (member && member.bioguide_id && member.name) {
-        const opt = document.createElement("option");
-        opt.value = member.bioguide_id;
-        // Add more info to dropdown text if desired
-        // opt.textContent = `${member.name} (${member.party_code || '?'}-${member.state || '?'})`;
-        opt.textContent = member.name; // Keep it simple for now
-        memberSelect.appendChild(opt);
-      } else {
-        console.warn("Skipping member due to missing ID or name:", member);
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    console.log(`Passed: ${count}`);
+    opt.textContent =
+      filt.length === 0 ? "-- No match --" : `-- Select (${filt.length}) --`;
+    filt.forEach((m) => {
+      if (m?.bioguide_id && m?.name) {
+        const o = document.createElement("option");
+        o.value = m.bioguide_id;
+        o.textContent = m.name;
+        memberSelect.appendChild(o);
       }
     });
-    console.log(
-      `Finished Populating dropdown. Rendered Options: ${filteredMembers.length}`
-    );
   }
-
-  // --- Function to fetch member detail data ---
-  async function fetchMemberDetailData(memberId) {
-    console.log(`Fetching details for member ${memberId}...`);
-    if (!memberInfoDiv) {
-      console.error("Member info container not found.");
+  async function fetchMemberDetailData(id) {
+    /* ... */ if (!memberInfoDiv || !id) {
+      clearData();
       return;
     }
-    if (!memberId) {
-      console.warn("fetchMemberDetailData called with no memberId.");
-      clearData(); // Clear display if ID is missing
-      return;
-    }
-
+    console.log(`Fetching details ${id}...`);
     memberInfoDiv.classList.remove("hidden");
-    if (tabButtons.length > 0) switchTab(tabButtons[0]); // Reset to first tab
-
-    // Show loading states reliably
-    if (memberDetailsContainer) {
-      memberDetailsContainer.innerHTML = ""; // Clear previous content
-      memberDetailsContainer.classList.add("loading"); // Add loading class for styling spinner etc.
+    tabButtons[0] && switchTab(tabButtons[0]);
+    if (memberDetailsCoreContainer) {
+      memberDetailsCoreContainer.innerHTML = "";
+      memberDetailsCoreContainer.classList.add("loading");
     }
     if (memberPhoto) memberPhoto.style.display = "none";
     if (photoLoadingError) photoLoadingError.style.display = "none";
+    if (photoAttribution) photoAttribution.textContent = "";
+    if (termHistoryList) termHistoryList.innerHTML = "";
+    if (partyHistoryList) partyHistoryList.innerHTML = "";
+    if (leadershipHistoryList) leadershipHistoryList.innerHTML = "";
     if (sponsoredItemsStatus) {
       sponsoredItemsStatus.classList.add("loading");
-      if (sponsoredItemsList) sponsoredItemsList.innerHTML = ""; // Clear list while loading
+      sponsoredItemsList && (sponsoredItemsList.innerHTML = "");
     }
     if (cosponsoredItemsStatus) {
       cosponsoredItemsStatus.classList.add("loading");
-      if (cosponsoredItemsList) cosponsoredItemsList.innerHTML = ""; // Clear list while loading
+      cosponsoredItemsList && (cosponsoredItemsList.innerHTML = "");
     }
-
-    // Clear previous error messages from all status divs
-    const statusDivs = [
+    [
       sponsoredItemsStatus,
       cosponsoredItemsStatus,
-      memberDetailsContainer,
-    ];
-    statusDivs.forEach((div) => {
-      if (div) {
-        const errorElement = div.querySelector(".error-message");
-        if (errorElement) errorElement.remove();
-      }
-    });
-    if (photoLoadingError.parentNode) {
-      // Clear errors near photo
-      const photoContainerErrors =
-        photoLoadingError.parentNode.querySelectorAll(".error-message");
-      photoContainerErrors.forEach((e) => e.remove());
-      photoLoadingError.style.display = "none"; // Ensure specific photo error is hidden too
-    }
-
-    const url = `/api/member/${memberId}`; // Use existing member detail API
-    let responseData = null; // To store response data for error reporting
-
+      memberDetailsCoreContainer,
+    ].forEach((div) => div?.querySelector(".error-message")?.remove());
+    photoLoadingError.parentNode
+      ?.querySelectorAll(".error-message")
+      .forEach((e) => e.remove());
+    photoLoadingError.style.display = "none";
+    const url = `/api/member/${id}`;
+    let data = null;
     try {
-      const response = await fetch(url);
-      responseData = await response.json(); // Try parsing JSON regardless of status for error messages
-      console.log("Member detail data received:", responseData);
-
-      if (!response.ok) {
-        // Prioritize error message from JSON body if available
-        const errorMsg =
-          responseData?.error ||
-          responseData?.member_details_error ||
-          `HTTP error ${response.status} ${response.statusText}`;
-        throw new Error(errorMsg);
+      const r = await fetch(url);
+      data = await r.json();
+      console.log("Detail recv:", data);
+      if (!r.ok) {
+        const msg =
+          data?.error || data?.member_details_error || `HTTP ${r.status}`;
+        throw new Error(msg);
       }
-      // Additional check if response is ok but data structure is weird
-      if (!responseData || typeof responseData !== "object") {
-        throw new Error("Invalid response format from server.");
-      }
-
-      // --- Update Display on Success ---
-      // Remove loading states first
-      if (memberDetailsContainer)
-        memberDetailsContainer.classList.remove("loading");
+      if (!data) throw new Error("Invalid resp.");
+      if (memberDetailsCoreContainer)
+        memberDetailsCoreContainer.classList.remove("loading");
       if (sponsoredItemsStatus)
         sponsoredItemsStatus.classList.remove("loading");
       if (cosponsoredItemsStatus)
         cosponsoredItemsStatus.classList.remove("loading");
-
-      updateDisplay(responseData); // Update display with fetched details
-    } catch (error) {
-      console.error("Could not fetch or process member detail data:", error);
-      // Remove loading states on error
-      if (memberDetailsContainer)
-        memberDetailsContainer.classList.remove("loading");
+      updateDisplay(data);
+    } catch (err) {
+      console.error("Fetch detail err:", err);
+      if (memberDetailsCoreContainer)
+        memberDetailsCoreContainer.classList.remove("loading");
       if (sponsoredItemsStatus)
         sponsoredItemsStatus.classList.remove("loading");
       if (cosponsoredItemsStatus)
         cosponsoredItemsStatus.classList.remove("loading");
-
-      // --- Display Errors ---
-      // Display primary error in the details section
-      if (memberDetailsContainer) {
-        memberDetailsContainer.innerHTML = ""; // Clear potential loading text
+      if (memberDetailsCoreContainer) {
         displayError(
-          memberDetailsContainer,
+          memberDetailsCoreContainer,
           null,
-          `Could not load details: ${error.message}`
+          `Details Err: ${err.message}`
         );
       } else {
-        // Fallback if details container missing
-        alert(`Error loading member details: ${error.message}`);
+        alert(`Err: ${err.message}`);
       }
-
-      // Display specific errors in other sections if available from response, else generic
-      const sponsoredErrorMsg =
-        responseData?.sponsored_items_error ||
-        "Could not load sponsored items.";
-      displayError(sponsoredItemsStatus, sponsoredItemsList, sponsoredErrorMsg);
-
-      const cosponsoredErrorMsg =
-        responseData?.cosponsored_items_error ||
-        "Could not load cosponsored items.";
+      displayError(
+        sponsoredItemsStatus,
+        sponsoredItemsList,
+        data?.sponsored_items_error || "Sponsored Err."
+      );
       displayError(
         cosponsoredItemsStatus,
         cosponsoredItemsList,
-        cosponsoredErrorMsg
+        data?.cosponsored_items_error || "Cosponsored Err."
       );
-
-      // Ensure photo/photo error are hidden
       if (memberPhoto) memberPhoto.style.display = "none";
       if (photoLoadingError) photoLoadingError.style.display = "none";
     }
   }
 
-  // --- Function to update the display (Member Details) ---
+  // --- Function to update the display (Member Details & History) ---
   function updateDisplay(data) {
     console.log("Updating member display START");
     if (!data || typeof data !== "object") {
@@ -501,88 +335,178 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // --- Member Details & Photo Tab ---
     const details = data.member_details;
-    if (details && typeof details === "object" && memberDetailsContainer) {
-      // --- START: Generate HTML for Grid Layout ---
-      let detailsHtml = "";
-      const memberFromList = allMembersData.find(
-        (m) => m.bioguide_id === details.bioguide_id
-      );
 
-      if (details.name) {
-        detailsHtml += `<strong>Name:</strong><span>${details.name}</span>`;
-      }
-      if (details.state || details.party || memberFromList?.chamber) {
-        let infoLine = "";
-        if (details.state) infoLine += `${details.state}`;
-        if (details.party)
-          infoLine += `${infoLine ? " | " : ""}${details.party}`;
-        if (memberFromList?.chamber)
-          infoLine += `${infoLine ? " | " : ""}${memberFromList.chamber}`;
-        detailsHtml += `<strong>Info:</strong><span>${
-          infoLine || "N/A"
-        }</span>`;
-      }
-      if (details.birth_year) {
-        detailsHtml += `<strong>Birth Year:</strong><span>${details.birth_year}</span>`;
-      }
+    // Clear previous history content
+    if (termHistoryList) termHistoryList.innerHTML = "";
+    if (partyHistoryList) partyHistoryList.innerHTML = "";
+    if (leadershipHistoryList) leadershipHistoryList.innerHTML = "";
+    if (photoAttribution) photoAttribution.textContent = "";
+
+    if (details && typeof details === "object" && memberDetailsCoreContainer) {
+      memberDetailsCoreContainer.style.display = "grid"; // Ensure grid
+
+      // --- Determine Honorific & Latest Term Info ---
+      let honorific = details.honorificName ? `${details.honorificName}. ` : ""; // Use honorificName if provided
+      let latestTermInfo = null;
+      let latestChamber = null;
       if (
-        details.leadership &&
-        Array.isArray(details.leadership) &&
-        details.leadership.length > 0
+        details.terms &&
+        Array.isArray(details.terms) &&
+        details.terms.length > 0
       ) {
-        detailsHtml += `<strong>Leadership:</strong><span>${details.leadership
-          .map((l) => l?.type || "?")
-          .join(", ")}</span>`;
+        details.terms.sort(
+          (a, b) =>
+            (b.congress || 0) - (a.congress || 0) ||
+            (b.startYear || 0) - (a.startYear || 0)
+        );
+        latestTermInfo = details.terms[0];
+        latestChamber = latestTermInfo?.chamber; // Get chamber from latest term
+        // Determine honorific based on LATEST term's chamber if not directly provided
+        if (!honorific && latestChamber) {
+          if (latestChamber === "Senate") honorific = "Sen. ";
+          else if (latestChamber === "House") honorific = "Rep. ";
+        }
       }
+
+      // --- Core Details ---
+      let coreDetailsHtml = "";
+      const displayName = honorific + (details.name || "N/A");
+      coreDetailsHtml += `<strong>Name:</strong><span>${displayName}</span>`;
+
+      let infoLine = "";
+      if (details.state) infoLine += `${details.state}`; // Use state from main details
+      const latestParty =
+        details.partyHistory?.length > 0
+          ? details.partyHistory[details.partyHistory.length - 1]?.partyName
+          : details.party;
+      if (latestParty)
+        infoLine += `${infoLine ? " | " : ""}${latestParty || "N/A"}`;
+      if (latestChamber) infoLine += `${infoLine ? " | " : ""}${latestChamber}`; // Use chamber from latest term
+      if (infoLine)
+        coreDetailsHtml += `<strong>Info:</strong><span>${infoLine}</span>`;
+      if (details.birth_year)
+        coreDetailsHtml += `<strong>Born:</strong><span>${details.birth_year}</span>`;
       if (details.website_url) {
-        let safeUrl = details.website_url.trim();
+        /* (keep website logic as before) */ let safeUrl =
+          details.website_url.trim();
         if (safeUrl && !safeUrl.startsWith("http"))
           safeUrl = "https://" + safeUrl;
         try {
           new URL(safeUrl);
-          detailsHtml += `<strong>Website:</strong><a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Official Website</a>`;
+          coreDetailsHtml += `<strong>Website:</strong><a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Official Website</a>`;
         } catch (_) {
-          detailsHtml += `<strong>Website:</strong><span>(Invalid URL)</span>`;
+          coreDetailsHtml += `<strong>Website:</strong><span>(Invalid URL)</span>`;
         }
       }
-
-      // Add Term info if available (example)
-      // if (details.terms && details.terms.length > 0) {
-      //     const currentTerm = details.terms.sort((a,b) => b.congress - a.congress)[0];
-      //     if (currentTerm) {
-      //          detailsHtml += `<strong>Current Term:</strong><span>Congress ${currentTerm.congress} (${currentTerm.startYear}-${currentTerm.endYear || 'Present'})</span>`;
-      //     }
-      // }
-
-      if (detailsHtml.trim() === "") {
-        detailsHtml =
-          '<p class="error-message">Member details not available.</p>'; // Span full width
-        memberDetailsContainer.style.display = "block"; // Revert grid if only error
-      } else {
-        memberDetailsContainer.style.display = "grid"; // Ensure grid is applied
-      }
-
       if (data.member_details_error) {
-        detailsHtml += `<p class="error-message">${data.member_details_error}</p>`; // Span full width
-        memberDetailsContainer.style.display = "block"; // Revert grid if only error
+        coreDetailsHtml += `<p class="error-message">${data.member_details_error}</p>`;
+        memberDetailsCoreContainer.style.display = "block";
       }
-      memberDetailsContainer.innerHTML = detailsHtml;
-      // --- END: Generate HTML for Grid Layout ---
+      memberDetailsCoreContainer.innerHTML = coreDetailsHtml;
 
-      // Photo logic (Keep as before)
+      // --- Term History ---
+      if (termHistoryList && details.terms && details.terms.length > 0) {
+        details.terms.forEach((term) => {
+          // Already sorted
+          const li = document.createElement("li");
+          const termYears = `${term.startYear || "?"} - ${
+            term.endYear || "Present"
+          }`;
+          // --- *** Use term.stateName *** ---
+          const location = term.district
+            ? `${term.stateName || "?"} (Dist. ${term.district})`
+            : term.stateName || "?";
+          // --- *** ---
+          li.innerHTML = `<strong>${
+            term.congress || "?"
+          }th Congress</strong> (${termYears})<br><span>${
+            term.chamber || "?"
+          } - ${location}</span>`;
+          termHistoryList.appendChild(li);
+        });
+      } else if (termHistoryList) {
+        termHistoryList.innerHTML = "<li>No term history available.</li>";
+      }
+
+      // --- Party History ---
+      if (
+        partyHistoryList &&
+        details.partyHistory &&
+        details.partyHistory.length > 0
+      ) {
+        details.partyHistory.sort(
+          (a, b) => (b.startYear || 0) - (a.startYear || 0)
+        ); // Sort by start year desc
+        details.partyHistory.forEach((p) => {
+          const li = document.createElement("li");
+          // Use startYear and endYear if available
+          const dateRange =
+            p.startYear && p.endYear
+              ? `${p.startYear} - ${p.endYear}`
+              : p.startYear
+              ? `${p.startYear} - Present`
+              : "? - ?";
+          li.innerHTML = `<strong>${
+            p.partyName || "?"
+          }</strong> <span>(${dateRange})</span>`;
+          partyHistoryList.appendChild(li);
+        });
+      } else if (partyHistoryList) {
+        partyHistoryList.innerHTML = "<li>No party history available.</li>";
+      }
+
+      // --- Leadership History ---
+      if (
+        leadershipHistoryList &&
+        details.leadership &&
+        details.leadership.length > 0
+      ) {
+        // Sort by congress desc, then potential start date
+        details.leadership.sort(
+          (a, b) =>
+            (b.congress || 0) - (a.congress || 0) ||
+            (b.startDate || "").localeCompare(a.startDate || "")
+        );
+        details.leadership.forEach((l) => {
+          const li = document.createElement("li");
+          // Check for start/end date, otherwise just show congress
+          const dateInfo =
+            l.startDate && l.endDate
+              ? `${l.startDate} - ${l.endDate}`
+              : l.startDate
+              ? `${l.startDate} - Present`
+              : "";
+          li.innerHTML =
+            `<strong>${l.type || "?"}</strong> (Congress ${
+              l.congress || "?"
+            })` + (dateInfo ? `<br><span>${dateInfo}</span>` : "");
+          leadershipHistoryList.appendChild(li);
+        });
+      } else if (leadershipHistoryList) {
+        leadershipHistoryList.innerHTML =
+          "<li>No leadership history available.</li>";
+      }
+
+      // --- Photo & Attribution ---
+      let imageUrl = `https://bioguide.congress.gov/bioguide/photo/${details.bioguide_id[0]}/${details.bioguide_id}.jpg`;
+      let attributionText = "";
+      if (details.depiction?.imageUrl) {
+        imageUrl = details.depiction.imageUrl;
+        attributionText = details.depiction.attribution || "";
+      }
       if (details.bioguide_id && memberPhoto && photoLoadingError) {
-        const photoUrl = `https://bioguide.congress.gov/bioguide/photo/${details.bioguide_id[0]}/${details.bioguide_id}.jpg`;
-        memberPhoto.src = photoUrl;
+        memberPhoto.src = imageUrl;
         memberPhoto.alt = `Photo of ${details.name || "member"}`;
         memberPhoto.style.display = "block";
         photoLoadingError.style.display = "none";
+        if (photoAttribution) photoAttribution.innerHTML = attributionText; // Use innerHTML for attribution link
         memberPhoto.onerror = () => {
           memberPhoto.style.display = "none";
           photoLoadingError.textContent = "No photo";
           photoLoadingError.style.display = "block";
           memberPhoto.onerror = null;
+          if (photoAttribution) photoAttribution.textContent = "";
         };
         memberPhoto.onload = () => {
           photoLoadingError.style.display = "none";
@@ -596,22 +520,31 @@ document.addEventListener("DOMContentLoaded", () => {
             : "ID missing";
           photoLoadingError.style.display = "block";
         }
+        if (photoAttribution) photoAttribution.textContent = "";
       }
     } else {
-      // Handle missing details
-      if (memberDetailsContainer)
+      // Handle missing 'details'
+      if (memberDetailsCoreContainer) {
+        memberDetailsCoreContainer.style.display = "block";
         displayError(
-          memberDetailsContainer,
+          memberDetailsCoreContainer,
           null,
           data.member_details_error || "Details unavailable."
         );
+      }
       if (memberPhoto) memberPhoto.style.display = "none";
       if (photoLoadingError) photoLoadingError.style.display = "none";
+      if (photoAttribution) photoAttribution.textContent = "";
+      if (termHistoryList)
+        termHistoryList.innerHTML = "<li>Err loading history.</li>";
+      if (partyHistoryList)
+        partyHistoryList.innerHTML = "<li>Err loading history.</li>";
+      if (leadershipHistoryList)
+        leadershipHistoryList.innerHTML = "<li>Err loading history.</li>";
     }
-    console.log("Member details & photo updated.");
+    console.log("Member details, photo & history updated.");
 
-    // --- Legislation Tabs ---
-    // Update counts
+    // --- Legislation Tabs (Keep as before) ---
     const sponsoredCountSpan = document.getElementById("sponsored-count");
     const cosponsoredCountSpan = document.getElementById("cosponsored-count");
     if (sponsoredCountSpan)
@@ -622,233 +555,142 @@ document.addEventListener("DOMContentLoaded", () => {
         data.cosponsored_count !== undefined
           ? `(${data.cosponsored_count})`
           : "";
-
-    // Update lists (Keep as before)
-    [sponsoredItemsStatus, cosponsoredItemsStatus].forEach(
-      (statusEl, index) => {
-        const listEl = index === 0 ? sponsoredItemsList : cosponsoredItemsList;
-        const items =
-          index === 0 ? data.sponsored_items : data.cosponsored_items;
-        const error =
-          index === 0
-            ? data.sponsored_items_error
-            : data.cosponsored_items_error;
-        const type = index === 0 ? "sponsored" : "cosponsored";
-        if (listEl && statusEl) {
-          listEl.innerHTML = "";
-          statusEl.querySelector(".error-message")?.remove();
-          if (error) {
-            displayError(statusEl, listEl, error);
-          } else if (items?.length > 0) {
-            try {
-              items.forEach((item) => {
-                if (item) listEl.appendChild(createLegislationListItem(item));
-              });
-            } catch (e) {
-              displayError(statusEl, listEl, `Err displaying ${type}.`);
-            }
-          } else {
-            listEl.innerHTML = `<li>No recent ${type} legislation found.</li>`;
+    [sponsoredItemsStatus, cosponsoredItemsStatus].forEach((sEl, i) => {
+      const lEl = i === 0 ? sponsoredItemsList : cosponsoredItemsList;
+      const items = i === 0 ? data.sponsored_items : data.cosponsored_items;
+      const err =
+        i === 0 ? data.sponsored_items_error : data.cosponsored_items_error;
+      const t = i === 0 ? "sponsored" : "cosponsored";
+      if (lEl && sEl) {
+        lEl.innerHTML = "";
+        sEl.querySelector(".error-message")?.remove();
+        if (err) {
+          displayError(sEl, lEl, err);
+        } else if (items?.length > 0) {
+          try {
+            items.forEach((item) => {
+              if (item) lEl.appendChild(createLegislationListItem(item));
+            });
+          } catch (e) {
+            displayError(sEl, lEl, `Err displaying ${t}.`);
           }
+        } else {
+          lEl.innerHTML = `<li>No recent ${t}.</li>`;
         }
       }
-    );
+    });
     console.log("Display update END");
   }
 
-  // --- Function to clear the display ---
   function clearData() {
-    console.log("Clearing member display data.");
-    if (memberInfoDiv) memberInfoDiv.classList.add("hidden"); // Hide the whole section
-
-    // Reset details tab
-    if (memberDetailsContainer) {
-      memberDetailsContainer.innerHTML =
-        "<p>Select a member to view details.</p>";
-      memberDetailsContainer.classList.remove("loading"); // Remove loading class
-      const e = memberDetailsContainer.querySelector(".error-message");
-      if (e) e.remove(); // Remove error message
+    if (memberInfoDiv) memberInfoDiv.classList.add("hidden");
+    if (memberDetailsCoreContainer) {
+      memberDetailsCoreContainer.innerHTML = "<p>Select member</p>";
+      memberDetailsCoreContainer.classList.remove("loading");
+      memberDetailsCoreContainer.querySelector(".error-message")?.remove();
+      memberDetailsCoreContainer.style.display = "block";
     }
+    if (termHistoryList) termHistoryList.innerHTML = "";
+    if (partyHistoryList) partyHistoryList.innerHTML = "";
+    if (leadershipHistoryList) leadershipHistoryList.innerHTML = "";
     if (memberPhoto) {
       memberPhoto.style.display = "none";
-      memberPhoto.src = ""; // Clear src
+      memberPhoto.src = "";
     }
     if (photoLoadingError) {
-      photoLoadingError.style.display = "none"; // Hide photo error
-      const pe = photoLoadingError.parentNode?.querySelector(".error-message"); // Clear general errors near photo
-      if (pe) pe.remove();
+      photoLoadingError.style.display = "none";
+      photoLoadingError.parentNode
+        ?.querySelectorAll(".error-message")
+        .forEach((e) => e.remove());
     }
-
-    // Clear Sponsored Tab
-    if (sponsoredItemsStatus) {
-      sponsoredItemsStatus.classList.remove("loading");
-      const e = sponsoredItemsStatus.querySelector(".error-message");
-      if (e) e.remove();
-    }
+    if (photoAttribution) photoAttribution.textContent = "";
+    [sponsoredItemsStatus, cosponsoredItemsStatus].forEach((div) => {
+      if (div) {
+        div.classList.remove("loading");
+        div.querySelector(".error-message")?.remove();
+      }
+    });
     if (sponsoredItemsList)
-      sponsoredItemsList.innerHTML =
-        "<li>Select a member to view sponsored legislation.</li>"; // Reset placeholder
-
-    // Clear Cosponsored Tab
-    if (cosponsoredItemsStatus) {
-      cosponsoredItemsStatus.classList.remove("loading");
-      const e = cosponsoredItemsStatus.querySelector(".error-message");
-      if (e) e.remove();
-    }
+      sponsoredItemsList.innerHTML = "<li>Select member</li>";
     if (cosponsoredItemsList)
-      cosponsoredItemsList.innerHTML =
-        "<li>Select a member to view cosponsored legislation.</li>"; // Reset placeholder
-
-    // Reset Tab selection to default (first tab)
-    if (tabButtons && tabButtons.length > 0) {
-      switchTab(tabButtons[0]);
-    }
+      cosponsoredItemsList.innerHTML = "<li>Select member</li>";
+    if (tabButtons?.length > 0) switchTab(tabButtons[0]);
+    document
+      .querySelectorAll(".item-count")
+      .forEach((c) => (c.textContent = ""));
   }
 
-  // --- Tab Switching Logic --- (Keep as before, ensure it's robust)
-  function switchTab(selectedButton) {
-    if (!selectedButton || !tabButtons || !tabPanes) return;
-    tabButtons.forEach((b) => b.classList.remove("active"));
-    tabPanes.forEach((p) => p.classList.remove("active"));
-
-    selectedButton.classList.add("active");
-    const targetId = selectedButton.getAttribute("data-tab");
-    const targetPane = document.getElementById(targetId);
-    if (targetPane) {
-      targetPane.classList.add("active");
-      // console.log(`Switched to tab: ${targetId}`); // Optional log
-    } else {
-      console.error(`Tab pane missing: ${targetId}`);
-      // Fallback to first tab if target is missing
-      if (tabButtons.length > 0) tabButtons[0].classList.add("active");
-      if (tabPanes.length > 0) tabPanes[0].classList.add("active");
-    }
-  }
-
-  // --- Event Listeners Setup ---
-  console.log("Setting up listeners...");
-
-  // --- Congress Filter Listener ---
-  if (congressFilterSelect) {
+  // --- Event Listeners & Initial Load (Keep exactly as before) ---
+  if (congressFilterSelect)
     congressFilterSelect.addEventListener("change", (e) => {
-      const selectedCongress = e.target.value;
-      if (!selectedCongress) {
-        console.warn("Congress selection cleared or invalid.");
-        // Optionally disable member select and clear data
+      const c = e.target.value;
+      if (!c) {
         memberSelect.innerHTML =
           '<option value="">-- Select Congress --</option>';
         memberSelect.disabled = true;
         clearData();
         return;
       }
-      console.log(`Congress selection changed to: ${selectedCongress}`);
-      currentFilters.congress = selectedCongress;
-      clearData(); // Clear member details display
-      memberSelect.value = ""; // Reset member dropdown selection
-      // Fetch members for the newly selected Congress
-      fetchCongressMembers(selectedCongress);
+      currentFilters.congress = c;
+      clearData();
+      memberSelect.value = "";
+      fetchCongressMembers(c);
     });
-  } else {
-    console.warn("Congress filter select element not found.");
-  }
-
-  // --- Member Select Listener ---
-  if (memberSelect) {
+  if (memberSelect)
     memberSelect.addEventListener("change", (e) => {
-      const memberId = e.target.value;
-      if (memberId) {
-        fetchMemberDetailData(memberId); // Fetch details for selected member
-      } else {
-        clearData(); // Clear display if "-- Choose Member --" or similar is selected
-      }
+      fetchMemberDetailData(e.target.value);
     });
-  } else {
-    console.error("Member select dropdown element not found!");
-  }
-
-  // --- Other Filter Listeners (Party, Chamber, State, Name) ---
-  // These ONLY trigger repopulating the *existing* dropdown based on `allMembersData`
   if (nameSearchInput) {
-    let debounceTimeout;
+    let dt;
     nameSearchInput.addEventListener("input", (e) => {
-      clearTimeout(debounceTimeout);
-      debounceTimeout = setTimeout(() => {
+      clearTimeout(dt);
+      dt = setTimeout(() => {
         currentFilters.name = e.target.value;
-        populateMemberDropdown(); // Repopulate dropdown from currentCongressMembers
-        // Don't necessarily clear data pane unless you want filter changes to always reset view
-        // clearData();
-        // Reset dropdown selection to default('-- Select ...') when filters change
+        populateMemberDropdown();
         memberSelect.value = "";
-        // If a member was selected, changing filters should clear the detail view
-        if (memberInfoDiv && !memberInfoDiv.classList.contains("hidden")) {
-          clearData();
-        }
-      }, 300); // Debounce input
+        if (!memberInfoDiv?.classList.contains("hidden")) clearData();
+      }, 300);
     });
   }
-  if (partyFilters.length > 0) {
-    partyFilters.forEach((radio) => {
-      radio.addEventListener("change", (e) => {
+  if (partyFilters.length > 0)
+    partyFilters.forEach((r) =>
+      r.addEventListener("change", (e) => {
         if (e.target.checked) {
-          // Ensure it's the selected radio
           currentFilters.party = e.target.value;
-          populateMemberDropdown(); // Repopulate dropdown
-          memberSelect.value = ""; // Reset selection
-          if (memberInfoDiv && !memberInfoDiv.classList.contains("hidden"))
-            clearData(); // Clear details
+          populateMemberDropdown();
+          memberSelect.value = "";
+          if (!memberInfoDiv?.classList.contains("hidden")) clearData();
         }
-      });
-    });
-  }
-  if (chamberFilters.length > 0) {
-    chamberFilters.forEach((radio) => {
-      radio.addEventListener("change", (event) => {
-        if (event.target.checked) {
-          currentFilters.chamber = event.target.value;
-          populateMemberDropdown(); // Repopulate dropdown
-          memberSelect.value = ""; // Reset selection
-          if (memberInfoDiv && !memberInfoDiv.classList.contains("hidden"))
-            clearData(); // Clear details
+      })
+    );
+  if (chamberFilters.length > 0)
+    chamberFilters.forEach((r) =>
+      r.addEventListener("change", (e) => {
+        if (e.target.checked) {
+          currentFilters.chamber = e.target.value;
+          populateMemberDropdown();
+          memberSelect.value = "";
+          if (!memberInfoDiv?.classList.contains("hidden")) clearData();
         }
-      });
-    });
-  }
-  if (stateFilterSelect) {
+      })
+    );
+  if (stateFilterSelect)
     stateFilterSelect.addEventListener("change", (e) => {
       currentFilters.state = e.target.value;
-      populateMemberDropdown(); // Repopulate dropdown
-      memberSelect.value = ""; // Reset selection
-      if (memberInfoDiv && !memberInfoDiv.classList.contains("hidden"))
-        clearData(); // Clear details
+      populateMemberDropdown();
+      memberSelect.value = "";
+      if (!memberInfoDiv?.classList.contains("hidden")) clearData();
     });
-  }
-
-  // Tab Button Listeners
-  if (tabButtons.length > 0) {
-    tabButtons.forEach((button) => {
-      button.addEventListener("click", () => switchTab(button));
-    });
-  } else {
-    console.warn("Tab buttons not found.");
-  }
-
-  // --- Initial Population ---
-  clearData(); // Set initial state (cleared display)
-
-  // Fetch members for the initially selected Congress (if one is selected)
+  if (tabButtons.length > 0)
+    tabButtons.forEach((b) => b.addEventListener("click", () => switchTab(b)));
+  clearData();
   const initialCongressValue = congressFilterSelect
     ? congressFilterSelect.value
     : null;
   if (initialCongressValue) {
-    console.log(
-      `Initial load: Fetching members for Congress ${initialCongressValue}`
-    );
-    currentFilters.congress = initialCongressValue; // Ensure filter state matches dropdown
+    currentFilters.congress = initialCongressValue;
     fetchCongressMembers(initialCongressValue);
   } else {
-    console.warn(
-      "Initial Congress not selected in dropdown, cannot fetch members on load."
-    );
     memberSelect.innerHTML = '<option value="">-- Select Congress --</option>';
     memberSelect.disabled = true;
   }

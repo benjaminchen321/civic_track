@@ -30,39 +30,52 @@
             <button class="tab-button" data-tab="cosponsored-tab">Cosponsored</button>
         </div>
         <div class="tab-content">
-            <!-- Details Tab (Keep structure as corrected before) -->
+            <!-- Details Tab -->
             <div id="details-tab" class="tab-pane active" aria-live="polite">
                  <h2>Member Details</h2>
-                 <div class="member-photo-container">
-                      <img id="member-photo" src="" alt="Member Photo" style="display: none;">
-                      <span id="photo-loading-error" class="error-message"></span>
+                 <!-- Top Section: Photo and Core Info -->
+                 <div class="details-top-section">
+                     <div class="member-photo-container">
+                          <img id="member-photo" src="" alt="Member Photo" style="display: none;">
+                          <span id="photo-loading-error" class="error-message"></span>
+                          <span id="photo-attribution" class="photo-attribution-text"></span>
+                     </div>
+                     <div id="member-details-core" class="member-details-grid">
+                         <!-- Core details populated by JS -->
+                         Select a member to view details.
+                     </div>
                  </div>
-                 <div id="member-details-content">Select a member to view details.</div>
+                 <!-- History Sections -->
+                 <div class="details-history-section">
+                    <div id="term-history" class="history-group">
+                        <h4>Term History</h4>
+                        <ul id="term-history-list"></ul>
+                    </div>
+                    <div id="party-history" class="history-group">
+                        <h4>Party History</h4>
+                        <ul id="party-history-list"></ul>
+                    </div>
+                     <div id="leadership-history" class="history-group">
+                        <h4>Leadership History</h4>
+                        <ul id="leadership-history-list"></ul>
+                    </div>
+                 </div>
             </div>
 
             <!-- Sponsored Tab -->
             <div id="sponsored-tab" class="tab-pane">
-                 <!-- Add span for count -->
                  <h2>Recently Sponsored <span class="item-count" id="sponsored-count"></span></h2>
-                 <div id="sponsored-items-status" aria-live="polite">
-                    <div class="loader"></div>
-                    <ul id="sponsored-items-list"><li>Loading...</li></ul>
-                 </div>
+                 <div id="sponsored-items-status" aria-live="polite"><div class="loader"></div><ul id="sponsored-items-list"><li>Loading...</li></ul></div>
             </div>
 
             <!-- Cosponsored Tab -->
             <div id="cosponsored-tab" class="tab-pane">
-                 <!-- Add span for count -->
                  <h2>Recently Cosponsored <span class="item-count" id="cosponsored-count"></span></h2>
-                 <div id="cosponsored-items-status" aria-live="polite">
-                    <div class="loader"></div>
-                    <ul id="cosponsored-items-list"><li>Loading...</li></ul>
-                 </div>
+                 <div id="cosponsored-items-status" aria-live="polite"><div class="loader"></div><ul id="cosponsored-items-list"><li>Loading...</li></ul></div>
             </div>
         </div>
     </div>
 
-    <!-- Scripts (Keep as before) -->
     <script>let currentCongressMembers=[]; const initialCongress={{ current_congress | tojson | safe }};</script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>

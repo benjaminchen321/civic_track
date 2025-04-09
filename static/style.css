@@ -1,5 +1,4 @@
 /* FILE: static/style.css */
-/* ... (Keep variables, reset, general styles as before) ... */
 :root {
   --primary-color: #0d6efd;
   --primary-hover: #0b5ed7;
@@ -54,7 +53,7 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-} /* Flex for H2 + count */
+}
 h3 {
   font-size: 1.25rem;
 }
@@ -62,9 +61,10 @@ h4 {
   font-size: 1.1rem;
   color: var(--text-muted);
   margin-top: 1.5em;
-}
-
-/* Style for item counts in H2 */
+  margin-bottom: 0.5em;
+  border-bottom: 1px dashed var(--border-color);
+  padding-bottom: 0.3em;
+} /* Style history titles */
 .item-count {
   font-size: 0.8em;
   font-weight: 500;
@@ -76,9 +76,7 @@ h4 {
 }
 .item-count:empty {
   display: none;
-} /* Hide if empty */
-
-/* Filters (Keep as before) */
+}
 #filter-controls {
   background-color: var(--background-card);
   padding: 20px 25px;
@@ -130,8 +128,6 @@ h4 {
   vertical-align: middle;
   accent-color: var(--primary-color);
 }
-
-/* Member Selection (Keep as before) */
 #member-selection-area {
   margin-bottom: 30px;
   padding: 20px 25px;
@@ -185,8 +181,6 @@ h4 {
   padding: 0.25rem 0.5rem;
   font-size: 0.85rem;
 }
-
-/* Main Info Card (Keep as before) */
 #member-info {
   background-color: var(--background-card);
   border-radius: var(--border-radius);
@@ -198,8 +192,6 @@ h4 {
 #member-info.hidden {
   display: none;
 }
-
-/* Tabs (Keep as before) */
 .tab-nav {
   display: flex;
   background-color: transparent;
@@ -249,13 +241,19 @@ h4 {
 
 /* --- Details Tab Layout --- */
 #details-tab {
-  display: flex;
-  flex-wrap: wrap;
+  display: flex; /* Use flex for overall tab content */
+  flex-direction: column; /* Stack sections vertically */
+  gap: 30px; /* Space between top section and history section */
+}
+.details-top-section {
+  display: flex; /* Lay out photo and core info side-by-side */
+  flex-wrap: wrap; /* Allow wrapping on small screens */
   gap: 30px;
-  align-items: flex-start;
+  align-items: flex-start; /* Align tops */
+  width: 100%;
 }
 
-/* Photo Container (Keep circular style) */
+/* Photo Container */
 .member-photo-container {
   flex-basis: 120px;
   flex-shrink: 0;
@@ -269,6 +267,7 @@ h4 {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative; /* For attribution positioning */
 }
 #member-photo {
   display: block;
@@ -283,48 +282,96 @@ h4 {
   padding: 5px;
   color: var(--text-muted);
 }
+.photo-attribution-text {
+  /* Style for attribution */
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  font-size: 0.6rem;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 1px 3px;
+  text-align: center;
+  opacity: 0.7;
+}
+.photo-attribution-text:empty {
+  display: none;
+}
 
-/* --- Details Content Re-Layout --- */
-#member-details-content {
+/* Core Details Grid */
+.member-details-grid {
+  /* Renamed from #member-details-content */
   flex-grow: 1;
   min-height: 120px; /* Align roughly with photo */
-  display: grid; /* Use Grid for more control */
-  grid-template-columns: auto 1fr; /* Label column, Value column */
-  gap: 0.5em 1em; /* Row gap, Column gap */
-  align-items: baseline; /* Align text baselines */
+  display: grid;
+  grid-template-columns: auto 1fr; /* Label | Value */
+  gap: 0.5em 1em;
+  align-items: baseline;
 }
-#member-details-content.loading {
+.member-details-grid.loading {
   display: block;
   text-align: center;
-} /* Revert to block for loader */
-
-#member-details-content > strong {
-  /* Style labels */
+} /* Revert for loader */
+.member-details-grid > strong {
   grid-column: 1 / 2;
   color: var(--text-color);
   font-weight: 600;
-  text-align: right; /* Align labels right */
+  text-align: right;
 }
-#member-details-content > span, /* Style values */
-#member-details-content > a {
+.member-details-grid > span,
+.member-details-grid > a {
   grid-column: 2 / 3;
-  word-break: break-word; /* Allow long values to wrap */
+  word-break: break-word;
 }
-#member-details-content > a {
+.member-details-grid > a {
   color: var(--primary-color);
   text-decoration: none;
   font-weight: 500;
 }
-#member-details-content > a:hover {
+.member-details-grid > a:hover {
   color: var(--primary-hover);
   text-decoration: underline;
 }
-/* Error message within details */
-#member-details-content > p.error-message {
-  grid-column: 1 / -1; /* Span both columns */
+.member-details-grid > p.error-message {
+  grid-column: 1 / -1;
   margin-top: 1em;
 }
-/* --- End Details Re-Layout --- */
+
+/* --- History Sections --- */
+.details-history-section {
+  width: 100%;
+  margin-top: 20px; /* Space above history */
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+  display: grid; /* Layout history groups */
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(250px, 1fr)
+  ); /* Responsive columns */
+  gap: 30px;
+}
+.history-group ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.9rem;
+}
+.history-group li {
+  padding: 0.4em 0;
+  border-bottom: 1px solid var(--background-light); /* Lighter separator */
+}
+.history-group li:last-child {
+  border-bottom: none;
+}
+.history-group li strong {
+  font-weight: 600;
+  color: var(--text-color);
+}
+.history-group li span {
+  color: var(--text-muted);
+  margin-left: 5px;
+}
 
 /* Legislation Lists (Keep as before) */
 #sponsored-items-list,
@@ -387,10 +434,10 @@ div.loading > .loader,
   }
 }
 div.loading ul,
-div.loading #member-details-content > *:not(.loader):not(.error-message) {
+div.loading .member-details-grid > *:not(.loader):not(.error-message) {
   opacity: 0.5;
   transition: opacity 0.2s ease-in-out;
-}
+} /* Target grid items */
 div.loading .member-photo-container img {
   opacity: 0.5;
 }
@@ -399,12 +446,13 @@ div.loading .member-photo-container img {
   display: block;
   margin: 30px auto;
 }
-#member-details-content.loading .loader {
+.member-details-grid.loading .loader {
   display: block;
   margin: 30px auto;
   position: static;
   transform: none;
-}
+  grid-column: 1 / -1;
+} /* Center loader in grid */
 
 /* Error Message (Keep as before) */
 .error-message {
@@ -422,7 +470,7 @@ div.loading .member-photo-container img {
   display: none;
 }
 
-/* Responsive Adjustments (Keep as before, grid handles some wrapping) */
+/* Responsive Adjustments */
 @media (max-width: 992px) {
   #filter-controls {
     gap: 20px;
@@ -459,25 +507,28 @@ div.loading .member-photo-container img {
     min-width: 100%;
     max-width: none;
   }
-  #details-tab {
+  .details-top-section {
     flex-direction: column;
     align-items: center;
     text-align: center;
-  }
+  } /* Stack photo and core info */
   .member-photo-container {
     margin-bottom: 20px;
   }
-  #member-details-content {
+  .member-details-grid {
     display: block; /* Revert grid on small screens */
     text-align: center;
     min-height: auto;
   }
-  #member-details-content > strong {
+  .member-details-grid > strong {
     text-align: left;
     display: inline-block;
     width: auto;
     margin-right: 5px;
-  } /* Adjust strong for non-grid */
+  }
+  .details-history-section {
+    grid-template-columns: 1fr; /* Stack history groups */
+  }
   .tab-nav {
     padding: 0 10px;
     overflow-x: auto;
@@ -501,7 +552,7 @@ div.loading .member-photo-container img {
     font-size: 1.3rem;
     display: block;
     text-align: center;
-  } /* Stack H2 and count */
+  }
   .item-count {
     display: inline-block;
     margin-left: 5px;
