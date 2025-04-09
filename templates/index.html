@@ -11,6 +11,19 @@
 
     <!-- Filter Controls -->
     <div id="filter-controls">
+         <!-- START: Add Congress Filter -->
+         <div class="filter-group">
+             <label for="congress-filter">Congress:</label>
+             <select id="congress-filter">
+                 <!-- Options populated by JS -->
+                 {% for congress_info in congresses %}
+                 <option value="{{ congress_info.number }}" {% if congress_info.number == current_congress %}selected{% endif %}>
+                     {{ congress_info.number }} ({{ congress_info.startYear }}-{{ congress_info.endYear or 'Present' }})
+                 </option>
+                 {% endfor %}
+             </select>
+         </div>
+         <!-- END: Add Congress Filter -->
          <div class="filter-group">
             <label for="name-search">Search by Name:</label>
             <input type="text" id="name-search" placeholder="Enter name...">
@@ -23,10 +36,19 @@
             <label><input type="radio" name="party-filter" value="ID"> Other</label>
         </div>
          <div class="filter-group">
+             <span class="filter-label">Filter by Chamber:</span>
+             <label><input type="radio" name="chamber-filter" value="ALL" checked> All</label>
+             {% for chamber in chambers %}
+             {% if chamber %}
+             <label><input type="radio" name="chamber-filter" value="{{ chamber }}"> {{ chamber }}</label>
+             {% endif %}
+             {% endfor %}
+         </div>
+         <div class="filter-group">
              <label for="state-filter">Filter by State:</label>
              <select id="state-filter">
                  <option value="ALL">All States</option>
-                 {% for state in states %} {# Assumes 'states' is passed from Flask #}
+                 {% for state in states %}
                  <option value="{{ state }}">{{ state }}</option>
                  {% endfor %}
              </select>
@@ -37,25 +59,24 @@
     <div id="member-selection-area">
         <label for="member-select">Choose a Member:</label>
         <div id="member-select-container">
-            <!-- Always render the select tag, JS will handle population/disabling -->
-            <select name="members" id="member-select">
-               <option value="">-- Loading Members --</option>
-               <!-- Options populated by JS -->
+            <!-- Dropdown populated by JS -->
+            <select name="members" id="member-select" disabled> <!-- Start disabled -->
+               <option value="">-- Select Congress First --</option>
             </select>
-            <!-- JS will add error message here if needed -->
+            <!-- Loading indicator for member list -->
+            <span id="member-list-loader" class="loader" style="display: none; vertical-align: middle; margin-left: 10px;"></span>
+            <span id="member-list-error" class="error-message" style="display: none; vertical-align: middle; margin-left: 10px;"></span>
          </div>
      </div>
 
-
+    <!-- Member Info Display (No changes needed here for now) -->
     <div id="member-info" class="hidden" style="margin-top: 20px;">
         <!-- Tab Navigation -->
         <div class="tab-nav">
             <button class="tab-button active" data-tab="details-tab">Details</button>
-            <!-- Committee tab removed -->
-            <button class="tab-button" data-tab="bills-tab">Sponsored Bills</button>
-            <button class="tab-button" data-tab="votes-tab">Recent Votes</button>
+            <button class="tab-button" data-tab="sponsored-tab">Sponsored</button>
+            <button class="tab-button" data-tab="cosponsored-tab">Cosponsored</button>
         </div>
-
         <!-- Tab Content -->
         <div class="tab-content">
             <!-- Details Tab -->
@@ -66,54 +87,41 @@
                          <img id="member-photo" src="" alt="Member Photo" style="display: none;">
                          <span id="photo-loading-error" class="error-message" style="display: none;">Photo not available</span>
                     </div>
-                    <!-- Changed p to div to allow innerHTML -->
                     <div id="member-details-content">Select a member to view details.</div>
                  </div>
             </div>
-
-             <!-- Bills Tab -->
-            <div id="bills-tab" class="tab-pane">
-                 <h2>Recently Sponsored Bills</h2>
-                 <div id="sponsored-bills-status" aria-live="polite">
+             <!-- Sponsored Legislation Tab -->
+            <div id="sponsored-tab" class="tab-pane">
+                 <h2>Recently Sponsored Legislation</h2>
+                 <div id="sponsored-items-status" aria-live="polite">
                     <div class="loader"></div>
-                    <ul id="sponsored-bills-list">
+                    <ul id="sponsored-items-list">
                         <li>Loading...</li>
                     </ul>
                  </div>
             </div>
-
-            <!-- Votes Tab -->
-            <div id="votes-tab" class="tab-pane">
-                 <h2>Recent Votes</h2>
-                 <div id="votes-status" aria-live="polite">
+            <!-- Cosponsored Legislation Tab -->
+            <div id="cosponsored-tab" class="tab-pane">
+                 <h2>Recently Cosponsored Legislation</h2>
+                 <div id="cosponsored-items-status" aria-live="polite">
                     <div class="loader"></div>
-                    <ul id="vote-list">
+                    <ul id="cosponsored-items-list">
                         <li>Loading...</li>
                     </ul>
                  </div>
             </div>
-        </div> <!-- End tab-content -->
-    </div> <!-- End member-info -->
+        </div>
+    </div>
 
-    <!-- Embed full member list as JSON for JavaScript -->
-    <!-- Ensure this is valid JSON passed from Flask using |tojson|safe -->
+    <!-- NO LONGER embedding member list JSON -->
     <script>
-        let allMembersData = []; // Default to empty array
-        try {
-            // Use |tojson|safe filter in Flask template for security
-            allMembersData = JSON.parse({{ all_members_json|tojson|safe }});
-            if (!Array.isArray(allMembersData)) { // Basic validation
-                 console.error("Parsed member data is not an array:", allMembersData);
-                 allMembersData = [];
-            }
-        } catch (e) {
-            console.error("Failed to parse embedded member JSON data:", e);
-            // Keep allMembersData as empty array
-        }
-        console.log(`Inline script: Parsed ${allMembersData.length} members.`);
+        // Global variable to hold the currently loaded FULL member list for the selected Congress
+        let currentCongressMembers = [];
+        // Store the initially selected Congress
+        const initialCongress = {{ current_congress|tojson|safe }};
     </script>
 
-    <!-- Link your main script AFTER the data is defined -->
+    <!-- Link your main script AFTER the data/variables are defined -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
