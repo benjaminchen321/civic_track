@@ -364,6 +364,7 @@ def get_member_details(bioguide_id):
     """Fetches detailed info for a member."""
     endpoint = f"/member/{bioguide_id}"
     data, error = _make_api_request(endpoint)
+    print(f"DEBUGGING-----data: {data}")
     payload = {"details": None, "error": error}
     if data and "member" in data and isinstance(data["member"], dict):
         m_data = data["member"]
@@ -382,11 +383,16 @@ def get_member_details(bioguide_id):
             or m_data.get("name"),
             "bioguide_id": m_data.get("bioguideId"),
             "state": m_data.get("state"),
-            "party": p_name,
+            "party": p_name,  # Keep the latest party for core display
             "birth_year": m_data.get("birthYear"),
-            "leadership": m_data.get("leadership", []),
+            "leadership": m_data.get("leadership", []),  # Already correct
             "website_url": m_data.get("directUrl") or m_data.get("url"),
             "terms": m_data.get("terms"),
+            "partyHistory": m_data.get("partyHistory", []),  # <-- ADD THIS LINE
+            # Add depiction directly if needed for photo logic consistency
+            "depiction": m_data.get("depiction"),
+            # Add honorificName if available
+            "honorificName": m_data.get("honorificName"),
         }
     elif not error:
         payload["error"] = (

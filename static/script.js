@@ -430,6 +430,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // --- Party History ---
+      console.log("data:", data);
+      console.log("details:", details);
       if (
         partyHistoryList &&
         details.partyHistory &&
