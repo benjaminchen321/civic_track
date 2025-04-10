@@ -12,7 +12,7 @@
 
     <!-- Filter Controls (Keep as before) -->
     <div id="filter-controls">
-         <div class="filter-group"><label for="congress-filter">Congress:</label><select id="congress-filter">{% for c in congresses %}<option value="{{ c.number }}" {% if c.number == current_congress %}selected{% endif %}>{{ c.number }} ({{ c.startYear or '?' }}-{{ c.endYear or 'Present' }})</option>{% else %}<option value="">Err</option>{% endfor %}</select></div>
+         <div class="filter-group"><label for="congress-filter">Congress:</label><select id="congress-filter">{% for c in congresses %}<option value="{{ c.number }}" {% if c.number == current_congress %}selected{% endif %}>{{ c.number }} ({{ c.startYear or '?' }}-{{ c.endYear or 'Present' }})</option>{% else %}<option value="">Err Loading</option>{% endfor %}</select></div>
          <div class="filter-group"><label for="name-search">Name:</label><input type="text" id="name-search" placeholder="Enter name..."></div>
          <div class="filter-group"><span class="filter-label">Party:</span><label><input type="radio" name="party-filter" value="ALL" checked> All</label><label><input type="radio" name="party-filter" value="D"> Dem</label><label><input type="radio" name="party-filter" value="R"> Rep</label><label><input type="radio" name="party-filter" value="ID"> Other</label></div>
          <div class="filter-group"><span class="filter-label">Chamber:</span><label><input type="radio" name="chamber-filter" value="ALL" checked> All</label>{% for ch in chambers %}{% if ch %}<label><input type="radio" name="chamber-filter" value="{{ ch }}"> {{ ch }}</label>{% endif %}{% endfor %}</div>
@@ -26,57 +26,93 @@
     <div id="member-info" class="hidden">
         <div class="tab-nav">
             <button class="tab-button active" data-tab="details-tab">Details</button>
-            <button class="tab-button" data-tab="sponsored-tab">Sponsored</button>
-            <button class="tab-button" data-tab="cosponsored-tab">Cosponsored</button>
+            <button class="tab-button" data-tab="committees-tab">Committees</button> <!-- New Tab -->
+            <button class="tab-button" data-tab="sponsored-tab">Sponsored <span class="item-count" id="sponsored-count"></span></button> <!-- Added count span -->
+            <button class="tab-button" data-tab="cosponsored-tab">Cosponsored <span class="item-count" id="cosponsored-count"></span></button> <!-- Added count span -->
+            <button class="tab-button" data-tab="votes-tab">Votes</button> <!-- New Tab -->
         </div>
         <div class="tab-content">
-            <!-- Details Tab -->
+            <!-- Details Tab (Structure Updated) -->
             <div id="details-tab" class="tab-pane active" aria-live="polite">
                  <h2>Member Details</h2>
-                 <!-- Top Section: Photo and Core Info -->
-                 <div class="details-top-section">
-                     <div class="member-photo-container">
-                          <img id="member-photo" src="" alt="Member Photo" style="display: none;">
-                          <span id="photo-loading-error" class="error-message"></span>
-                          <span id="photo-attribution" class="photo-attribution-text"></span>
+                 <div id="member-details-status" aria-live="polite"> <!-- Wrapper for loading/error -->
+                     <div class="loader"></div>
+                     <p class="error-message"></p>
+                     <!-- Top Section: Photo and Core Info -->
+                     <div class="details-top-section">
+                         <div class="member-photo-container">
+                              <img id="member-photo" src="" alt="Member Photo" style="display: none;">
+                              <span id="photo-loading-error" class="error-message"></span>
+                              <span id="photo-attribution" class="photo-attribution-text"></span>
+                         </div>
+                         <div id="member-details-core" class="member-details-grid">
+                             <!-- Core details populated by JS -->
+                             Select a member to view details.
+                         </div>
                      </div>
-                     <div id="member-details-core" class="member-details-grid">
-                         <!-- Core details populated by JS -->
-                         Select a member to view details.
+                     <!-- History Sections -->
+                     <div class="details-history-section">
+                        <div id="term-history" class="history-group">
+                            <h4>Term History</h4>
+                            <ul id="term-history-list"></ul>
+                        </div>
+                        <div id="party-history" class="history-group">
+                            <h4>Party History</h4>
+                            <ul id="party-history-list"></ul>
+                        </div>
+                         <div id="leadership-history" class="history-group">
+                            <h4>Leadership History</h4>
+                            <ul id="leadership-history-list"></ul>
+                        </div>
                      </div>
-                 </div>
-                 <!-- History Sections -->
-                 <div class="details-history-section">
-                    <div id="term-history" class="history-group">
-                        <h4>Term History</h4>
-                        <ul id="term-history-list"></ul>
-                    </div>
-                    <div id="party-history" class="history-group">
-                        <h4>Party History</h4>
-                        <ul id="party-history-list"></ul>
-                    </div>
-                     <div id="leadership-history" class="history-group">
-                        <h4>Leadership History</h4>
-                        <ul id="leadership-history-list"></ul>
-                    </div>
                  </div>
             </div>
 
-            <!-- Sponsored Tab -->
+            <!-- Committees Tab (New Placeholder) -->
+            <div id="committees-tab" class="tab-pane">
+                 <h2>Committee Assignments</h2>
+                 <div id="committees-status" aria-live="polite">
+                     <p class="error-message"></p> <!-- For Not Implemented message -->
+                     <ul id="committees-list"><li>Loading...</li></ul>
+                 </div>
+            </div>
+
+            <!-- Sponsored Tab (Structure Updated) -->
             <div id="sponsored-tab" class="tab-pane">
-                 <h2>Recently Sponsored <span class="item-count" id="sponsored-count"></span></h2>
-                 <div id="sponsored-items-status" aria-live="polite"><div class="loader"></div><ul id="sponsored-items-list"><li>Loading...</li></ul></div>
+                 <h2>Recently Sponsored</h2> <!-- Count moved to tab button -->
+                 <div id="sponsored-items-status" aria-live="polite">
+                     <div class="loader"></div>
+                     <p class="error-message"></p>
+                     <ul id="sponsored-items-list"><li>Loading...</li></ul>
+                 </div>
             </div>
 
-            <!-- Cosponsored Tab -->
+            <!-- Cosponsored Tab (Structure Updated) -->
             <div id="cosponsored-tab" class="tab-pane">
-                 <h2>Recently Cosponsored <span class="item-count" id="cosponsored-count"></span></h2>
-                 <div id="cosponsored-items-status" aria-live="polite"><div class="loader"></div><ul id="cosponsored-items-list"><li>Loading...</li></ul></div>
+                 <h2>Recently Cosponsored</h2> <!-- Count moved to tab button -->
+                 <div id="cosponsored-items-status" aria-live="polite">
+                     <div class="loader"></div>
+                     <p class="error-message"></p>
+                     <ul id="cosponsored-items-list"><li>Loading...</li></ul>
+                 </div>
             </div>
+
+            <!-- Votes Tab (New Placeholder) -->
+            <div id="votes-tab" class="tab-pane">
+                 <h2>Recent Votes</h2>
+                 <div id="votes-status" aria-live="polite">
+                     <p class="error-message"></p> <!-- For Not Implemented message -->
+                     <ul id="votes-list"><li>Loading...</li></ul>
+                 </div>
+            </div>
+
         </div>
     </div>
 
-    <script>let currentCongressMembers=[]; const initialCongress={{ current_congress | tojson | safe }};</script>
+    <!-- Pass initial congress to JS -->
+    <script>
+        const initialCongress = {{ current_congress | tojson | safe }};
+    </script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

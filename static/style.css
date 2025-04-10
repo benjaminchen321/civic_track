@@ -64,19 +64,22 @@ h4 {
   margin-bottom: 0.5em;
   border-bottom: 1px dashed var(--border-color);
   padding-bottom: 0.3em;
-} /* Style history titles */
-.item-count {
-  font-size: 0.8em;
+}
+
+.tab-button .item-count {
+  font-size: 0.75em;
   font-weight: 500;
   color: var(--text-muted);
   background-color: var(--background-control);
-  padding: 0.15em 0.5em;
+  padding: 0.1em 0.4em;
   border-radius: 4px;
-  margin-left: 10px;
+  margin-left: 6px;
+  vertical-align: middle;
 }
-.item-count:empty {
+.tab-button .item-count:empty {
   display: none;
 }
+
 #filter-controls {
   background-color: var(--background-card);
   padding: 20px 25px;
@@ -128,6 +131,7 @@ h4 {
   vertical-align: middle;
   accent-color: var(--primary-color);
 }
+
 #member-selection-area {
   margin-bottom: 30px;
   padding: 20px 25px;
@@ -180,7 +184,9 @@ h4 {
   margin: 0;
   padding: 0.25rem 0.5rem;
   font-size: 0.85rem;
-}
+  color: var(--danger-color);
+} /* Make error red */
+
 #member-info {
   background-color: var(--background-card);
   border-radius: var(--border-radius);
@@ -192,11 +198,15 @@ h4 {
 #member-info.hidden {
   display: none;
 }
+
 .tab-nav {
   display: flex;
   background-color: transparent;
   border-bottom: 1px solid var(--border-color);
   padding: 0 15px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
 }
 .tab-button {
   padding: 1rem 1.25rem;
@@ -209,7 +219,7 @@ h4 {
   border-bottom: 3px solid transparent;
   transition: color 0.2s ease, border-color 0.2s ease;
   margin-bottom: -1px;
-  white-space: nowrap;
+  flex-shrink: 0;
 }
 .tab-button:hover {
   color: var(--text-color);
@@ -240,20 +250,38 @@ h4 {
 }
 
 /* --- Details Tab Layout --- */
-#details-tab {
-  display: flex; /* Use flex for overall tab content */
-  flex-direction: column; /* Stack sections vertically */
-  gap: 30px; /* Space between top section and history section */
+#member-details-status {
+  position: relative;
+  min-height: 150px;
 }
-.details-top-section {
-  display: flex; /* Lay out photo and core info side-by-side */
-  flex-wrap: wrap; /* Allow wrapping on small screens */
+/* Hide content sections initially until 'loaded' class is added */
+#member-details-status > .details-top-section,
+#member-details-status > .details-history-section {
+  display: none;
+}
+/* Show content sections when loaded */
+#member-details-status.loaded > .details-top-section,
+#member-details-status.loaded > .details-history-section {
+  display: flex; /* Or block/grid as needed */
+}
+/* Ensure top/history sections are also flex containers */
+#details-tab .details-top-section {
+  display: flex;
+  flex-wrap: wrap;
   gap: 30px;
-  align-items: flex-start; /* Align tops */
+  align-items: flex-start;
   width: 100%;
+  margin-bottom: 30px;
+}
+#details-tab .details-history-section {
+  width: 100%;
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 30px;
 }
 
-/* Photo Container */
 .member-photo-container {
   flex-basis: 120px;
   flex-shrink: 0;
@@ -267,7 +295,7 @@ h4 {
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative; /* For attribution positioning */
+  position: relative;
 }
 #member-photo {
   display: block;
@@ -281,9 +309,9 @@ h4 {
   text-align: center;
   padding: 5px;
   color: var(--text-muted);
-}
+  display: none;
+} /* Hide initially */
 .photo-attribution-text {
-  /* Style for attribution */
   position: absolute;
   bottom: 0;
   left: 0;
@@ -299,20 +327,14 @@ h4 {
   display: none;
 }
 
-/* Core Details Grid */
 .member-details-grid {
-  /* Renamed from #member-details-content */
   flex-grow: 1;
-  min-height: 120px; /* Align roughly with photo */
+  min-height: 120px;
   display: grid;
-  grid-template-columns: auto 1fr; /* Label | Value */
+  grid-template-columns: auto 1fr;
   gap: 0.5em 1em;
   align-items: baseline;
 }
-.member-details-grid.loading {
-  display: block;
-  text-align: center;
-} /* Revert for loader */
 .member-details-grid > strong {
   grid-column: 1 / 2;
   color: var(--text-color);
@@ -333,24 +355,7 @@ h4 {
   color: var(--primary-hover);
   text-decoration: underline;
 }
-.member-details-grid > p.error-message {
-  grid-column: 1 / -1;
-  margin-top: 1em;
-}
 
-/* --- History Sections --- */
-.details-history-section {
-  width: 100%;
-  margin-top: 20px; /* Space above history */
-  border-top: 1px solid var(--border-color);
-  padding-top: 20px;
-  display: grid; /* Layout history groups */
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(250px, 1fr)
-  ); /* Responsive columns */
-  gap: 30px;
-}
 .history-group ul {
   list-style: none;
   padding: 0;
@@ -359,7 +364,7 @@ h4 {
 }
 .history-group li {
   padding: 0.4em 0;
-  border-bottom: 1px solid var(--background-light); /* Lighter separator */
+  border-bottom: 1px solid var(--background-light);
 }
 .history-group li:last-child {
   border-bottom: none;
@@ -373,24 +378,31 @@ h4 {
   margin-left: 5px;
 }
 
-/* Legislation Lists (Keep as before) */
+/* Legislation & Other Lists */
 #sponsored-items-list,
-#cosponsored-items-list {
+#cosponsored-items-list,
+#committees-list,
+#votes-list {
   list-style: none;
   padding-left: 0;
   margin-top: 10px;
 }
 #sponsored-items-list li,
-#cosponsored-items-list li {
+#cosponsored-items-list li,
+#committees-list li,
+#votes-list li {
   padding: 0.8rem 0.5rem;
   border-bottom: 1px solid var(--border-color);
   font-size: 0.95rem;
   line-height: 1.5;
 }
 #sponsored-items-list li:last-child,
-#cosponsored-items-list li:last-child {
+#cosponsored-items-list li:last-child,
+#committees-list li:last-child,
+#votes-list li:last-child {
   border-bottom: none;
 }
+
 #sponsored-items-list li a,
 #cosponsored-items-list li a {
   font-weight: 600;
@@ -403,13 +415,23 @@ h4 {
   color: var(--primary-hover);
   text-decoration: underline;
 }
-#sponsored-items-list li > :not(a):not(strong),
-#cosponsored-items-list li > :not(a):not(strong) {
+
+.legislation-title {
+  display: block;
+  margin-bottom: 4px;
+}
+.legislation-meta {
+  font-size: 0.85em;
   color: var(--text-muted);
-  font-size: 0.9em;
+  display: block;
+}
+.legislation-meta span {
+  margin-right: 10px;
+  display: inline-block; /* Prevent wrapping mid-span */
+  margin-bottom: 3px;
 }
 
-/* Loading Spinner (Keep as before) */
+/* Loading Spinner */
 .loader {
   border: 4px solid #f3f3f3;
   border-top: 4px solid var(--primary-color);
@@ -420,11 +442,6 @@ h4 {
   margin: 20px auto;
   display: none;
 }
-div.loading > .loader,
-#member-select-container .loader {
-  display: inline-block;
-  vertical-align: middle;
-}
 @keyframes spin {
   0% {
     transform: rotate(0deg);
@@ -433,28 +450,61 @@ div.loading > .loader,
     transform: rotate(360deg);
   }
 }
-div.loading ul,
-div.loading .member-details-grid > *:not(.loader):not(.error-message) {
-  opacity: 0.5;
-  transition: opacity 0.2s ease-in-out;
-} /* Target grid items */
-div.loading .member-photo-container img {
-  opacity: 0.5;
-}
-#sponsored-items-status.loading .loader,
-#cosponsored-items-status.loading .loader {
-  display: block;
-  margin: 30px auto;
-}
-.member-details-grid.loading .loader {
-  display: block;
-  margin: 30px auto;
-  position: static;
-  transform: none;
-  grid-column: 1 / -1;
-} /* Center loader in grid */
 
-/* Error Message (Keep as before) */
+/* Loading State Handling */
+#member-select-container .loader {
+  display: inline-block;
+  vertical-align: middle;
+  width: 20px;
+  height: 20px;
+}
+
+/* Generic status containers */
+#member-details-status,
+#committees-status,
+#sponsored-items-status,
+#cosponsored-items-status,
+#votes-status {
+  position: relative;
+  min-height: 80px;
+}
+
+#member-details-status.loading > .loader,
+#committees-status.loading > .loader,
+#sponsored-items-status.loading > .loader,
+#cosponsored-items-status.loading > .loader,
+#votes-status.loading > .loader {
+  display: block;
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+/* Hide loader when NOT loading */
+#member-details-status:not(.loading) > .loader,
+#committees-status:not(.loading) > .loader,
+#sponsored-items-status:not(.loading) > .loader,
+#cosponsored-items-status:not(.loading) > .loader,
+#votes-status:not(.loading) > .loader {
+  display: none;
+}
+
+/* Fade out content ULs while loading corresponding tab */
+#committees-status.loading > ul,
+#sponsored-items-status.loading > ul,
+#cosponsored-items-status.loading > ul,
+#votes-status.loading > ul {
+  opacity: 0.5;
+  pointer-events: none;
+}
+/* Fade out details sections while details tab is loading */
+#member-details-status.loading > .details-top-section,
+#member-details-status.loading > .details-history-section {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Error Message */
 .error-message {
   color: var(--danger-color);
   background-color: var(--danger-background);
@@ -464,11 +514,19 @@ div.loading .member-photo-container img {
   border-radius: var(--border-radius);
   font-weight: 500;
   font-size: 0.95rem;
-  display: block;
-}
-.error-message:empty {
   display: none;
 }
+/* Show error message when present in a status container AND error class is present*/
+#member-details-status.error .error-message:not(:empty),
+#committees-status.error .error-message:not(:empty),
+#sponsored-items-status.error .error-message:not(:empty),
+#cosponsored-items-status.error .error-message:not(:empty),
+#votes-status.error .error-message:not(:empty) {
+  display: block;
+}
+.error-message.visible {
+  display: block;
+} /* Allow direct display control */
 
 /* Responsive Adjustments */
 @media (max-width: 992px) {
@@ -477,6 +535,12 @@ div.loading .member-photo-container img {
   }
   #member-select {
     min-width: 300px;
+  }
+  .tab-nav {
+    padding: 0 10px;
+  }
+  .tab-button {
+    padding: 0.9rem 1.1rem;
   }
 }
 @media (max-width: 768px) {
@@ -507,16 +571,16 @@ div.loading .member-photo-container img {
     min-width: 100%;
     max-width: none;
   }
-  .details-top-section {
+  #details-tab .details-top-section {
     flex-direction: column;
     align-items: center;
     text-align: center;
-  } /* Stack photo and core info */
+  }
   .member-photo-container {
     margin-bottom: 20px;
   }
   .member-details-grid {
-    display: block; /* Revert grid on small screens */
+    display: block;
     text-align: center;
     min-height: auto;
   }
@@ -526,12 +590,8 @@ div.loading .member-photo-container img {
     width: auto;
     margin-right: 5px;
   }
-  .details-history-section {
-    grid-template-columns: 1fr; /* Stack history groups */
-  }
-  .tab-nav {
-    padding: 0 10px;
-    overflow-x: auto;
+  #details-tab .details-history-section {
+    grid-template-columns: 1fr;
   }
   .tab-button {
     padding: 0.8rem 1rem;
@@ -550,13 +610,11 @@ div.loading .member-photo-container img {
   }
   h2 {
     font-size: 1.3rem;
-    display: block;
-    text-align: center;
   }
-  .item-count {
-    display: inline-block;
-    margin-left: 5px;
-    margin-top: 5px;
+  .tab-button .item-count {
+    font-size: 0.7em;
+    margin-left: 4px;
+    padding: 0.1em 0.3em;
   }
   #filter-controls,
   #member-selection-area {
@@ -572,8 +630,13 @@ div.loading .member-photo-container img {
     padding: 15px;
   }
   #sponsored-items-list li,
-  #cosponsored-items-list li {
+  #cosponsored-items-list li,
+  #committees-list li,
+  #votes-list li {
     font-size: 0.9rem;
     padding: 0.7rem 0.2rem;
+  }
+  .legislation-meta {
+    font-size: 0.8em;
   }
 }

@@ -1,8 +1,8 @@
 // FILE: static/script.js
-// ... (Keep references, other helpers, fetch functions etc. as before) ...
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("DOM Loaded.");
+  console.log("DOM Loaded. Initializing CivicTrack...");
+
   // --- References ---
   const memberSelect = document.getElementById("member-select");
   const memberListLoader = document.getElementById("member-list-loader");
@@ -14,30 +14,79 @@ document.addEventListener("DOMContentLoaded", () => {
     'input[name="chamber-filter"]'
   );
   const stateFilterSelect = document.getElementById("state-filter");
+
   const memberInfoDiv = document.getElementById("member-info");
+  const tabNav = document.querySelector(".tab-nav"); // Reference to the tab container
   const tabButtons = document.querySelectorAll(".tab-button");
   const tabPanes = document.querySelectorAll(".tab-pane");
-  const memberPhoto = document.getElementById("member-photo");
-  const photoLoadingError = document.getElementById("photo-loading-error");
+
+  // Tab Content References (Status divs and Lists)
+  const memberDetailsStatusDiv = document.getElementById(
+    "member-details-status"
+  );
   const memberDetailsCoreContainer = document.getElementById(
     "member-details-core"
-  ); // Corrected name
+  );
+  const memberPhoto = document.getElementById("member-photo");
+  const photoLoadingError = document.getElementById("photo-loading-error");
+  const photoAttribution = document.getElementById("photo-attribution");
   const termHistoryList = document.getElementById("term-history-list");
   const partyHistoryList = document.getElementById("party-history-list");
   const leadershipHistoryList = document.getElementById(
     "leadership-history-list"
   );
-  const photoAttribution = document.getElementById("photo-attribution");
-  const sponsoredItemsList = document.getElementById("sponsored-items-list");
-  const sponsoredItemsStatus = document.getElementById(
-    "sponsored-items-status"
-  );
-  const cosponsoredItemsList = document.getElementById(
-    "cosponsored-items-list"
-  );
-  const cosponsoredItemsStatus = document.getElementById(
+
+  const committeesStatusDiv = document.getElementById("committees-status");
+  const committeesList = document.getElementById("committees-list");
+
+  const sponsoredStatusDiv = document.getElementById("sponsored-items-status");
+  const sponsoredList = document.getElementById("sponsored-items-list");
+  const sponsoredCountSpan = document.getElementById("sponsored-count");
+
+  const cosponsoredStatusDiv = document.getElementById(
     "cosponsored-items-status"
   );
+  const cosponsoredList = document.getElementById("cosponsored-items-list");
+  const cosponsoredCountSpan = document.getElementById("cosponsored-count");
+
+  const votesStatusDiv = document.getElementById("votes-status");
+  const votesList = document.getElementById("votes-list");
+
+  // Map tab data-tab attribute to the corresponding elements and API path segment
+  const tabDataMap = {
+    "details-tab": {
+      statusDiv: memberDetailsStatusDiv,
+      listEl: null,
+      apiSegment: "details",
+      loaded: false,
+    },
+    "committees-tab": {
+      statusDiv: committeesStatusDiv,
+      listEl: committeesList,
+      apiSegment: "committees",
+      loaded: false,
+    },
+    "sponsored-tab": {
+      statusDiv: sponsoredStatusDiv,
+      listEl: sponsoredList,
+      apiSegment: "sponsored",
+      loaded: false,
+      countSpan: sponsoredCountSpan,
+    },
+    "cosponsored-tab": {
+      statusDiv: cosponsoredStatusDiv,
+      listEl: cosponsoredList,
+      apiSegment: "cosponsored",
+      loaded: false,
+      countSpan: cosponsoredCountSpan,
+    },
+    "votes-tab": {
+      statusDiv: votesStatusDiv,
+      listEl: votesList,
+      apiSegment: "votes",
+      loaded: false,
+    },
+  };
 
   // --- Globals and Constants ---
   let currentFilters = {
@@ -47,7 +96,10 @@ document.addEventListener("DOMContentLoaded", () => {
     state: "ALL",
     chamber: "ALL",
   };
-  let allMembersData = [];
+  let allMembersData = []; // Raw list of members for selected congress
+  let currentBioguideId = null; // Track the currently selected member
+
+  // Used for generating congress.gov links - must match backend
   const billTypePaths = {
     HR: "house-bill",
     S: "senate-bill",
@@ -61,363 +113,495 @@ document.addEventListener("DOMContentLoaded", () => {
     HAMDT: "house-amendment",
     SA: "senate-amendment",
     HA: "house-amendment",
+    SUAMDT: "senate-unamendable-amendment",
   };
 
-  // --- Helper Functions (Keep createLegislationListItem, displayError, switchTab as before) ---
+  // --- Helper Functions ---
+
+  /** Creates LI element for legislation (Bill/Amendment) */
   function createLegislationListItem(item) {
     const li = document.createElement("li");
-    let el = document.createElement("span");
-    el.textContent = "N/A";
-    const title = item.title || "No Title";
-    const cong = item.congress;
-    const typeCode = item.type;
-    const num = item.number;
-    if (!item) return li;
-    if (item.item_type === "Bill" && cong && typeCode && num !== null) {
-      let disp = `${typeCode}${num}`;
-      const path = billTypePaths[typeCode];
-      if (path) {
-        const url = `https://www.congress.gov/bill/${cong}th-congress/${path}/${num}`;
-        el = document.createElement("a");
-        el.href = url;
-        el.target = "_blank";
-        el.rel = "noopener noreferrer";
-        el.textContent = disp;
-      } else {
-        el.textContent = disp;
-      }
-    } else if (
-      item.item_type === "Amendment" &&
-      cong &&
-      typeCode &&
-      num !== null
+    if (
+      !item ||
+      !item.item_type ||
+      !item.type ||
+      item.number === null ||
+      !item.congress ||
+      !item.url
     ) {
-      let disp = `${typeCode} ${num}`;
-      const path = billTypePaths[typeCode];
-      if (path) {
-        const url = `https://www.congress.gov/amendment/${cong}th-congress/${path}/${num}`;
-        el = document.createElement("a");
-        el.href = url;
-        el.target = "_blank";
-        el.rel = "noopener noreferrer";
-        el.textContent = disp;
-      } else {
-        el.textContent = disp;
-      }
+      // Check item.url now
+      li.textContent = "Invalid item data received.";
+      li.style.color = "red";
+      console.warn("Cannot render invalid legislation item:", item);
+      return li;
+    }
+
+    const itemType = item.item_type;
+    const typeCode = item.type;
+    const number = item.number;
+    const title =
+      item.title ||
+      (itemType === "Amendment"
+        ? `Amendment ${typeCode} ${number}`
+        : "No Title Provided");
+    const introducedDate = item.introduced_date || "N/A";
+    const latestActionText = item.latest_action_text || "No recorded action";
+    const latestActionDate = item.latest_action_date || "";
+    const linkUrl = item.url; // Use URL directly from backend detail fetch
+
+    let linkEl;
+    const displayText =
+      itemType === "Amendment"
+        ? `${typeCode} ${number}`
+        : `${typeCode}${number}`;
+    if (linkUrl) {
+      linkEl = document.createElement("a");
+      linkEl.href = linkUrl;
+      linkEl.target = "_blank";
+      linkEl.rel = "noopener noreferrer";
+      linkEl.textContent = displayText;
     } else {
-      el.textContent = `Item: ${typeCode || "?"}${num || "?"}`;
-      console.warn("Cannot classify:", item);
+      linkEl = document.createElement("strong");
+      linkEl.textContent = displayText;
     }
-    li.appendChild(el);
-    li.appendChild(document.createTextNode(`: ${title} `));
-    if (item.introduced_date) {
-      li.appendChild(
-        document.createTextNode(`(Intro: ${item.introduced_date}) `)
-      );
+
+    const titleSpan = document.createElement("span");
+    titleSpan.className = "legislation-title";
+    titleSpan.textContent = `: ${title}`;
+
+    const metaSpan = document.createElement("span");
+    metaSpan.className = "legislation-meta";
+    let metaHtml = `<span>Introduced: ${introducedDate}</span>`;
+    if (latestActionDate) {
+      metaHtml += `<span>Latest Action: ${latestActionDate} (${latestActionText})</span>`;
+    } else {
+      metaHtml += `<span>(${latestActionText})</span>`;
     }
-    if (item.latest_action_text && item.latest_action_text !== "N/A") {
-      li.appendChild(
-        document.createTextNode(
-          `(Action: ${item.latest_action_text} on ${
-            item.latest_action_date || "N/A"
-          })`
-        )
-      );
-    } else if (item.introduced_date) {
-      li.appendChild(document.createTextNode(`(No recent action)`));
-    }
+    if (item.actions_count !== undefined)
+      metaHtml += `<span>Actions: ${item.actions_count}</span>`;
+    if (item.cosponsors_count !== undefined)
+      metaHtml += `<span>Cosponsors: ${item.cosponsors_count}</span>`;
+
+    metaSpan.innerHTML = metaHtml;
+
+    li.appendChild(linkEl);
+    li.appendChild(titleSpan);
+    li.appendChild(metaSpan);
     return li;
   }
-  function displayError(el, listEl, msg) {
-    if (!el) return;
-    el.classList.remove("loading");
-    el.querySelector(".loader")?.remove();
+
+  /** Displays error in a status container */
+  function displayError(statusDiv, listEl, msg) {
+    if (!statusDiv) return;
+    setLoading(statusDiv, false); // Ensure loading spinner is off
+    statusDiv.classList.add("error");
     if (listEl) listEl.innerHTML = "";
-    let errP = el.querySelector(".error-message");
-    if (!errP) {
-      errP = document.createElement("p");
-      errP.className = "error-message";
-      el.prepend(errP);
-    }
-    errP.textContent = msg || "Error.";
-    errP.style.display = "block";
-  }
-  function switchTab(btn) {
-    if (!btn || !tabButtons || !tabPanes) return;
-    tabButtons.forEach((b) => b.classList.remove("active"));
-    tabPanes.forEach((p) => p.classList.remove("active"));
-    btn.classList.add("active");
-    const targetId = btn.getAttribute("data-tab");
-    const targetPane = document.getElementById(targetId);
-    if (targetPane) targetPane.classList.add("active");
-    else {
-      tabButtons[0]?.classList.add("active");
-      tabPanes[0]?.classList.add("active");
+
+    const errorP = statusDiv.querySelector(".error-message");
+    if (errorP) {
+      errorP.textContent = msg || "An unexpected error occurred.";
+      // errorP.style.display = 'block'; // CSS handles display via .error class
+    } else {
+      console.error("Error <p> element not found in statusDiv:", statusDiv);
     }
   }
 
-  // --- Fetch Functions (Keep fetchCongressMembers, populateMemberDropdown, fetchMemberDetailData as before) ---
-  async function fetchCongressMembers(num) {
-    /* ... */ console.log(`Fetching members ${num}...`);
+  /** Clears error message */
+  function clearError(statusDiv) {
+    if (!statusDiv) return;
+    statusDiv.classList.remove("error");
+    const errorP = statusDiv.querySelector(".error-message");
+    if (errorP) {
+      errorP.textContent = "";
+      // errorP.style.display = 'none'; // CSS handles display via .error class removal
+    }
+  }
+
+  /** Sets loading state, explicitly hides/shows loader */
+  function setLoading(statusDiv, isLoading) {
+    if (!statusDiv) return;
+    const loader = statusDiv.querySelector(".loader");
+
+    clearError(statusDiv); // Clear any previous errors first
+
+    if (isLoading) {
+      statusDiv.classList.add("loading");
+      statusDiv.classList.remove("loaded"); // Remove loaded if setting to loading
+      if (loader) loader.style.display = "block";
+    } else {
+      statusDiv.classList.remove("loading");
+      if (loader) loader.style.display = "none"; // Explicitly hide loader
+      // For details tab, mark as loaded so CSS can show content
+      if (statusDiv.id === "member-details-status") {
+        statusDiv.classList.add("loaded");
+      }
+    }
+  }
+
+  /** Switches active tab, triggers lazy loading if needed */
+  function switchTab(targetButton) {
+    if (!targetButton || targetButton.classList.contains("active")) return; // Already active
+
+    const targetTabId = targetButton.getAttribute("data-tab");
+    if (!targetTabId) return;
+
+    console.log(`Switching to tab: ${targetTabId}`);
+
+    // Deactivate old tabs
+    tabButtons.forEach((b) => b.classList.remove("active"));
+    tabPanes.forEach((p) => p.classList.remove("active"));
+
+    // Activate new tab
+    targetButton.classList.add("active");
+    const targetPane = document.getElementById(targetTabId);
+    if (targetPane) {
+      targetPane.classList.add("active");
+      // Trigger lazy load if data for this tab hasn't been loaded yet for the current member
+      if (
+        tabDataMap[targetTabId] &&
+        !tabDataMap[targetTabId].loaded &&
+        targetTabId !== "details-tab"
+      ) {
+        console.log(`Lazy loading data for ${targetTabId}`);
+        loadTabData(targetTabId); // Fetch and populate data for this tab
+      }
+    } else {
+      // Fallback to details tab if target somehow doesn't exist
+      tabButtons[0]?.classList.add("active");
+      tabPanes[0]?.classList.add("active");
+      console.warn("Target tab pane not found:", targetTabId);
+    }
+  }
+
+  // --- Fetch Functions ---
+
+  /** Fetches list of members for a Congress */
+  async function fetchCongressMembers(congressNum) {
+    console.log(`Fetching members for Congress ${congressNum}...`);
     if (!memberSelect || !memberListLoader || !memberListError) return;
+
     memberSelect.disabled = true;
     memberListLoader.style.display = "inline-block";
     memberListError.style.display = "none";
-    memberSelect.innerHTML = '<option value="">-- Loading --</option>';
+    memberListError.textContent = "";
+    memberSelect.innerHTML = '<option value="">-- Loading Members --</option>';
     allMembersData = [];
+
     try {
-      const r = await fetch(`/api/members?congress=${num}`);
-      if (!r.ok) {
-        let msg = `Err: ${r.status}`;
+      const response = await fetch(`/api/members?congress=${congressNum}`);
+      if (!response.ok) {
+        let errorMsg = `Error: ${response.status}`;
         try {
-          const d = await r.json();
-          msg = d.error || msg;
+          errorMsg = (await response.json()).error || errorMsg;
         } catch (e) {}
-        throw new Error(msg);
+        throw new Error(errorMsg);
       }
-      const members = await r.json();
-      if (!Array.isArray(members)) throw new Error("Bad format.");
+      const members = await response.json();
+      if (!Array.isArray(members))
+        throw new Error("Invalid member data format.");
+
       allMembersData = members;
-      console.log(`Fetched ${allMembersData.length}.`);
+      console.log(
+        `Fetched ${allMembersData.length} members for Congress ${congressNum}.`
+      );
       memberListLoader.style.display = "none";
       populateMemberDropdown();
     } catch (err) {
-      console.error("Fetch members err:", err);
+      console.error("Error fetching congress members:", err);
       memberListLoader.style.display = "none";
-      memberListError.textContent = `Err: ${err.message}`;
+      memberListError.textContent = `Failed to load: ${err.message}`;
       memberListError.style.display = "inline-block";
       memberSelect.innerHTML = '<option value="">-- Error --</option>';
       allMembersData = [];
       memberSelect.disabled = true;
     }
   }
+
+  /** Populates member dropdown based on fetched data and filters */
   function populateMemberDropdown() {
-    /* ... */ if (!memberSelect || !memberListError) return;
+    // (No changes needed from previous version, logic is sound)
+    if (!memberSelect || !memberListError) return;
     memberListError.style.display = "none";
+    memberListError.textContent = "";
     memberSelect.innerHTML = "";
-    const opt = document.createElement("option");
-    opt.value = "";
-    opt.textContent = "-- Choose --";
-    memberSelect.appendChild(opt);
+
+    const placeholderOption = document.createElement("option");
+    placeholderOption.value = "";
+    memberSelect.appendChild(placeholderOption);
+
     if (!allMembersData?.length) {
-      opt.textContent = "-- None --";
+      placeholderOption.textContent = "-- No Members Found --";
       memberSelect.disabled = true;
       return;
     }
-    memberSelect.disabled = false;
-    const nF = currentFilters.name.toLowerCase().trim();
-    const pF = currentFilters.party;
-    const sF = currentFilters.state;
-    const cF = currentFilters.chamber;
-    console.log(
-      `Filtering ${allMembersData.length} C=${currentFilters.congress} P=${pF}, Ch=${cF}, St=${sF}, N=${nF}`
-    );
-    let count = 0;
-    const filt = allMembersData
+
+    const nameFilter = currentFilters.name.toLowerCase().trim();
+    const partyFilter = currentFilters.party;
+    const stateFilter = currentFilters.state;
+    const chamberFilter = currentFilters.chamber;
+
+    const filteredMembers = allMembersData
       .filter((m) => {
         if (!m) return false;
-        const nm = !nF || (m.name && m.name.toLowerCase().includes(nF));
-        const sm = sF === "ALL" || m.state === sF;
-        const chm =
-          cF === "ALL" ||
-          (m.chamber && m.chamber.toUpperCase() === cF.toUpperCase());
-        const pc = m.party_code || "";
-        let pm =
-          pF === "ALL" || (pF === "ID" ? pc !== "D" && pc !== "R" : pc === pF);
-        const pass = nm && sm && pm && chm;
-        if (pass) count++;
-        return pass;
+        const nameMatch =
+          !nameFilter || (m.name && m.name.toLowerCase().includes(nameFilter));
+        const stateMatch = stateFilter === "ALL" || m.state === stateFilter;
+        const chamberMatch =
+          chamberFilter === "ALL" ||
+          (m.chamber &&
+            m.chamber.toUpperCase() === chamberFilter.toUpperCase());
+        const partyCode = m.party_code || "";
+        const partyMatch =
+          partyFilter === "ALL" ||
+          (partyFilter === "ID"
+            ? partyCode !== "D" && partyCode !== "R"
+            : partyCode === partyFilter);
+        return nameMatch && stateMatch && partyMatch && chamberMatch;
       })
       .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    console.log(`Passed: ${count}`);
-    opt.textContent =
-      filt.length === 0 ? "-- No match --" : `-- Select (${filt.length}) --`;
-    filt.forEach((m) => {
-      if (m?.bioguide_id && m?.name) {
-        const o = document.createElement("option");
-        o.value = m.bioguide_id;
-        o.textContent = m.name;
-        memberSelect.appendChild(o);
+
+    if (filteredMembers.length === 0) {
+      placeholderOption.textContent = "-- No Matching Members --";
+      memberSelect.disabled = true;
+    } else {
+      placeholderOption.textContent = `-- Select Member (${filteredMembers.length}) --`;
+      memberSelect.disabled = false;
+      filteredMembers.forEach((m) => {
+        if (m?.bioguide_id && m?.name) {
+          const option = document.createElement("option");
+          option.value = m.bioguide_id;
+          let displayText = m.name;
+          if (m.party_code && m.state)
+            displayText += ` (${m.party_code}-${m.state})`;
+          else if (m.party_code) displayText += ` (${m.party_code})`;
+          else if (m.state) displayText += ` (${m.state})`;
+          option.textContent = displayText;
+          memberSelect.appendChild(option);
+        }
+      });
+    }
+  }
+
+  /** Fetches ONLY the basic details for a specific member */
+  async function fetchMemberDetailData(bioguideId) {
+    currentBioguideId = bioguideId; // Store current member ID
+    if (!memberInfoDiv) return;
+
+    // Reset loaded flags for all tabs when a new member is selected
+    Object.values(tabDataMap).forEach((tab) => (tab.loaded = false));
+
+    if (!bioguideId) {
+      clearMemberData();
+      return;
+    }
+
+    console.log(`Fetching details for member ${bioguideId}...`);
+    memberInfoDiv.classList.remove("hidden");
+    switchTab(tabButtons[0]); // Ensure Details tab is active
+
+    // Set loading ONLY for details tab initially
+    setLoading(memberDetailsStatusDiv, true);
+    // Set initial state for other tabs (e.g., "Loading..." placeholder)
+    Object.entries(tabDataMap).forEach(([tabId, tabInfo]) => {
+      if (tabId !== "details-tab" && tabInfo.statusDiv && tabInfo.listEl) {
+        clearError(tabInfo.statusDiv);
+        tabInfo.statusDiv.classList.remove("loading"); // Not loading yet
+        tabInfo.listEl.innerHTML = `<li>Click tab to load...</li>`; // Placeholder
+        if (tabInfo.countSpan) tabInfo.countSpan.textContent = ""; // Clear counts
       }
     });
-  }
-  async function fetchMemberDetailData(id) {
-    /* ... */ if (!memberInfoDiv || !id) {
-      clearData();
-      return;
-    }
-    console.log(`Fetching details ${id}...`);
-    memberInfoDiv.classList.remove("hidden");
-    tabButtons[0] && switchTab(tabButtons[0]);
-    if (memberDetailsCoreContainer) {
-      memberDetailsCoreContainer.innerHTML = "";
-      memberDetailsCoreContainer.classList.add("loading");
-    }
+
+    // Clear photo area
     if (memberPhoto) memberPhoto.style.display = "none";
-    if (photoLoadingError) photoLoadingError.style.display = "none";
+    if (photoLoadingError) {
+      photoLoadingError.style.display = "none";
+      photoLoadingError.textContent = "";
+    }
     if (photoAttribution) photoAttribution.textContent = "";
-    if (termHistoryList) termHistoryList.innerHTML = "";
-    if (partyHistoryList) partyHistoryList.innerHTML = "";
-    if (leadershipHistoryList) leadershipHistoryList.innerHTML = "";
-    if (sponsoredItemsStatus) {
-      sponsoredItemsStatus.classList.add("loading");
-      sponsoredItemsList && (sponsoredItemsList.innerHTML = "");
-    }
-    if (cosponsoredItemsStatus) {
-      cosponsoredItemsStatus.classList.add("loading");
-      cosponsoredItemsList && (cosponsoredItemsList.innerHTML = "");
-    }
-    [
-      sponsoredItemsStatus,
-      cosponsoredItemsStatus,
-      memberDetailsCoreContainer,
-    ].forEach((div) => div?.querySelector(".error-message")?.remove());
-    photoLoadingError.parentNode
-      ?.querySelectorAll(".error-message")
-      .forEach((e) => e.remove());
-    photoLoadingError.style.display = "none";
-    const url = `/api/member/${id}`;
-    let data = null;
+
+    const detailsApiUrl = `/api/member/${bioguideId}/details`;
     try {
-      const r = await fetch(url);
-      data = await r.json();
-      console.log("Detail recv:", data);
-      if (!r.ok) {
-        const msg =
-          data?.error || data?.member_details_error || `HTTP ${r.status}`;
-        throw new Error(msg);
+      const response = await fetch(detailsApiUrl);
+      const data = await response.json(); // Expecting { details: {...}, error: ... }
+      console.log("Received member details:", data);
+
+      if (!response.ok) {
+        throw new Error(data?.error || `HTTP Error ${response.status}`);
       }
-      if (!data) throw new Error("Invalid resp.");
-      if (memberDetailsCoreContainer)
-        memberDetailsCoreContainer.classList.remove("loading");
-      if (sponsoredItemsStatus)
-        sponsoredItemsStatus.classList.remove("loading");
-      if (cosponsoredItemsStatus)
-        cosponsoredItemsStatus.classList.remove("loading");
-      updateDisplay(data);
+      if (data.error) {
+        // Handle error within successful response
+        throw new Error(data.error);
+      }
+      if (!data.details) {
+        throw new Error("No member details found in response.");
+      }
+
+      // Update display ONLY with details data
+      updateMemberDetailsDisplay(data.details);
+      tabDataMap["details-tab"].loaded = true; // Mark details as loaded
+
+      setLoading(memberDetailsStatusDiv, false); // Stop details spinner
     } catch (err) {
-      console.error("Fetch detail err:", err);
-      if (memberDetailsCoreContainer)
-        memberDetailsCoreContainer.classList.remove("loading");
-      if (sponsoredItemsStatus)
-        sponsoredItemsStatus.classList.remove("loading");
-      if (cosponsoredItemsStatus)
-        cosponsoredItemsStatus.classList.remove("loading");
-      if (memberDetailsCoreContainer) {
-        displayError(
-          memberDetailsCoreContainer,
-          null,
-          `Details Err: ${err.message}`
-        );
-      } else {
-        alert(`Err: ${err.message}`);
-      }
+      console.error("Error fetching member details:", err);
+      clearMemberData(); // Clear partial data
+      memberInfoDiv.classList.remove("hidden");
       displayError(
-        sponsoredItemsStatus,
-        sponsoredItemsList,
-        data?.sponsored_items_error || "Sponsored Err."
+        memberDetailsStatusDiv,
+        null,
+        `Failed to load details for ${bioguideId}: ${err.message}`
       );
-      displayError(
-        cosponsoredItemsStatus,
-        cosponsoredItemsList,
-        data?.cosponsored_items_error || "Cosponsored Err."
-      );
-      if (memberPhoto) memberPhoto.style.display = "none";
-      if (photoLoadingError) photoLoadingError.style.display = "none";
+      setLoading(memberDetailsStatusDiv, false);
     }
   }
 
-  // --- Function to update the display (Member Details & History) ---
-  function updateDisplay(data) {
-    console.log("Updating member display START");
-    if (!data || typeof data !== "object") {
-      console.error("updateDisplay invalid data");
+  /** Fetches and populates data for a specific tab (Lazy Load) */
+  async function loadTabData(tabId) {
+    if (!currentBioguideId || !tabDataMap[tabId]) return;
+
+    const tabInfo = tabDataMap[tabId];
+    const { statusDiv, listEl, apiSegment, countSpan } = tabInfo;
+
+    if (!statusDiv || !apiSegment) return; // Should not happen for configured tabs
+
+    console.log(`Fetching data for tab ${tabId} (API: ${apiSegment})`);
+    setLoading(statusDiv, true);
+    if (listEl) listEl.innerHTML = ""; // Clear placeholder/old data
+    if (countSpan) countSpan.textContent = ""; // Clear count
+
+    // Handle non-list tabs or future implementations
+    if (apiSegment === "committees" || apiSegment === "votes") {
+      displayError(
+        statusDiv,
+        listEl,
+        `${
+          apiSegment.charAt(0).toUpperCase() + apiSegment.slice(1)
+        } data not yet implemented.`
+      );
+      // setLoading(statusDiv, false); // Already handled by displayError
+      tabInfo.loaded = true; // Mark as "loaded" to prevent re-fetch
       return;
     }
 
-    const details = data.member_details;
+    const apiUrl = `/api/member/${currentBioguideId}/${apiSegment}`;
 
-    // Clear previous history content
-    if (termHistoryList) termHistoryList.innerHTML = "";
-    if (partyHistoryList) partyHistoryList.innerHTML = "";
-    if (leadershipHistoryList) leadershipHistoryList.innerHTML = "";
-    if (photoAttribution) photoAttribution.textContent = "";
+    try {
+      const response = await fetch(apiUrl);
+      const data = await response.json(); // Expecting { items: [...], error: ..., count: ... }
+      console.log(`Received data for tab ${tabId}:`, data);
 
-    if (details && typeof details === "object" && memberDetailsCoreContainer) {
-      memberDetailsCoreContainer.style.display = "grid"; // Ensure grid
+      if (!response.ok) {
+        throw new Error(data?.error || `HTTP Error ${response.status}`);
+      }
+      if (data.error) {
+        // Handle error within successful response
+        throw new Error(data.error);
+      }
 
-      // --- Determine Honorific & Latest Term Info ---
-      let honorific = details.honorificName ? `${details.honorificName}. ` : ""; // Use honorificName if provided
-      let latestTermInfo = null;
-      let latestChamber = null;
-      if (
-        details.terms &&
-        Array.isArray(details.terms) &&
-        details.terms.length > 0
-      ) {
-        details.terms.sort(
-          (a, b) =>
-            (b.congress || 0) - (a.congress || 0) ||
-            (b.startYear || 0) - (a.startYear || 0)
-        );
-        latestTermInfo = details.terms[0];
-        latestChamber = latestTermInfo?.chamber; // Get chamber from latest term
-        // Determine honorific based on LATEST term's chamber if not directly provided
-        if (!honorific && latestChamber) {
-          if (latestChamber === "Senate") honorific = "Sen. ";
-          else if (latestChamber === "House") honorific = "Rep. ";
+      // Populate List
+      if (listEl) {
+        if (data.items && data.items.length > 0) {
+          data.items.forEach((item) => {
+            listEl.appendChild(createLegislationListItem(item));
+          });
+        } else {
+          listEl.innerHTML = `<li>No ${apiSegment} items found.</li>`;
         }
       }
 
-      // --- Core Details ---
-      let coreDetailsHtml = "";
+      // Update Count Span
+      if (countSpan) {
+        countSpan.textContent = `(${
+          data.count !== undefined ? data.count : "N/A"
+        })`;
+      }
+
+      tabInfo.loaded = true; // Mark tab as loaded successfully
+      setLoading(statusDiv, false);
+    } catch (err) {
+      console.error(`Error fetching data for tab ${tabId}:`, err);
+      displayError(
+        statusDiv,
+        listEl,
+        `Failed to load ${apiSegment} data: ${err.message}`
+      );
+      // setLoading(statusDiv, false); // Already handled by displayError
+      // Do not mark as loaded on error, so user can retry by switching tabs
+      tabInfo.loaded = false;
+    }
+  }
+
+  /** Updates ONLY the member details tab display */
+  function updateMemberDetailsDisplay(details) {
+    console.log("Updating member details display START");
+    if (!details || typeof details !== "object") {
+      console.error(
+        "updateMemberDetailsDisplay called with invalid details:",
+        details
+      );
+      displayError(
+        memberDetailsStatusDiv,
+        null,
+        "Internal error: Invalid details data."
+      );
+      return;
+    }
+
+    memberDetailsStatusDiv.classList.add("loaded"); // Allow CSS to show content
+
+    // -- Core Details --
+    if (memberDetailsCoreContainer) {
+      let coreHtml = "";
+      const honorific = details.honorificName
+        ? `${details.honorificName}. `
+        : "";
       const displayName = honorific + (details.name || "N/A");
-      coreDetailsHtml += `<strong>Name:</strong><span>${displayName}</span>`;
+      coreHtml += `<strong>Name:</strong><span>${displayName}</span>`;
 
       let infoLine = "";
-      if (details.state) infoLine += `${details.state}`; // Use state from main details
-      const latestParty =
-        details.partyHistory?.length > 0
-          ? details.partyHistory[details.partyHistory.length - 1]?.partyName
-          : details.party;
-      if (latestParty)
-        infoLine += `${infoLine ? " | " : ""}${latestParty || "N/A"}`;
-      if (latestChamber) infoLine += `${infoLine ? " | " : ""}${latestChamber}`; // Use chamber from latest term
+      if (details.party) infoLine += details.party;
+      if (details.state) infoLine += `${infoLine ? " | " : ""}${details.state}`;
+      let latestChamber = "Unknown";
+      if (details.terms && details.terms.length > 0) {
+        const latestTerm = details.terms[0]; // Assumes sorted by backend
+        if (latestTerm?.chamber) latestChamber = latestTerm.chamber;
+        // Handle full names like "House of Representatives"
+        if (latestChamber.includes("House")) latestChamber = "House";
+        else if (latestChamber.includes("Senate")) latestChamber = "Senate";
+      }
+      infoLine += `${infoLine ? " | " : ""}${latestChamber}`;
       if (infoLine)
-        coreDetailsHtml += `<strong>Info:</strong><span>${infoLine}</span>`;
+        coreHtml += `<strong>Info:</strong><span>${infoLine}</span>`;
+
       if (details.birth_year)
-        coreDetailsHtml += `<strong>Born:</strong><span>${details.birth_year}</span>`;
+        coreHtml += `<strong>Born:</strong><span>${details.birth_year}</span>`;
       if (details.website_url) {
-        /* (keep website logic as before) */ let safeUrl =
-          details.website_url.trim();
+        let safeUrl = details.website_url.trim();
         if (safeUrl && !safeUrl.startsWith("http"))
           safeUrl = "https://" + safeUrl;
         try {
           new URL(safeUrl);
-          coreDetailsHtml += `<strong>Website:</strong><a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Official Website</a>`;
+          coreHtml += `<strong>Website:</strong><a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Official Website</a>`;
         } catch (_) {
-          coreDetailsHtml += `<strong>Website:</strong><span>(Invalid URL)</span>`;
+          coreHtml += `<strong>Website:</strong><span>(Invalid URL)</span>`;
         }
       }
-      if (data.member_details_error) {
-        coreDetailsHtml += `<p class="error-message">${data.member_details_error}</p>`;
-        memberDetailsCoreContainer.style.display = "block";
-      }
-      memberDetailsCoreContainer.innerHTML = coreDetailsHtml;
+      memberDetailsCoreContainer.innerHTML = coreHtml;
+    }
 
-      // --- Term History ---
-      if (termHistoryList && details.terms && details.terms.length > 0) {
+    // -- Term History --
+    if (termHistoryList) {
+      termHistoryList.innerHTML = "";
+      if (details.terms && details.terms.length > 0) {
         details.terms.forEach((term) => {
-          // Already sorted
+          // Already sorted by backend
           const li = document.createElement("li");
           const termYears = `${term.startYear || "?"} - ${
             term.endYear || "Present"
           }`;
-          // --- *** Use term.stateName *** ---
+          const stateDisplay = term.stateName || term.stateCode || "?";
           const location = term.district
-            ? `${term.stateName || "?"} (Dist. ${term.district})`
-            : term.stateName || "?";
-          // --- *** ---
+            ? `${stateDisplay} (Dist. ${term.district})`
+            : stateDisplay;
           li.innerHTML = `<strong>${
             term.congress || "?"
           }th Congress</strong> (${termYears})<br><span>${
@@ -425,24 +609,20 @@ document.addEventListener("DOMContentLoaded", () => {
           } - ${location}</span>`;
           termHistoryList.appendChild(li);
         });
-      } else if (termHistoryList) {
+      } else {
         termHistoryList.innerHTML = "<li>No term history available.</li>";
       }
+    }
 
-      // --- Party History ---
-      console.log("data:", data);
-      console.log("details:", details);
-      if (
-        partyHistoryList &&
-        details.partyHistory &&
-        details.partyHistory.length > 0
-      ) {
+    // -- Party History --
+    if (partyHistoryList) {
+      partyHistoryList.innerHTML = "";
+      if (details.partyHistory && details.partyHistory.length > 0) {
         details.partyHistory.sort(
           (a, b) => (b.startYear || 0) - (a.startYear || 0)
-        ); // Sort by start year desc
+        ); // Sort client-side just in case
         details.partyHistory.forEach((p) => {
           const li = document.createElement("li");
-          // Use startYear and endYear if available
           const dateRange =
             p.startYear && p.endYear
               ? `${p.startYear} - ${p.endYear}`
@@ -454,25 +634,22 @@ document.addEventListener("DOMContentLoaded", () => {
           }</strong> <span>(${dateRange})</span>`;
           partyHistoryList.appendChild(li);
         });
-      } else if (partyHistoryList) {
+      } else {
         partyHistoryList.innerHTML = "<li>No party history available.</li>";
       }
+    }
 
-      // --- Leadership History ---
-      if (
-        leadershipHistoryList &&
-        details.leadership &&
-        details.leadership.length > 0
-      ) {
-        // Sort by congress desc, then potential start date
+    // -- Leadership History --
+    if (leadershipHistoryList) {
+      leadershipHistoryList.innerHTML = "";
+      if (details.leadership && details.leadership.length > 0) {
         details.leadership.sort(
           (a, b) =>
             (b.congress || 0) - (a.congress || 0) ||
             (b.startDate || "").localeCompare(a.startDate || "")
-        );
+        ); // Sort client-side
         details.leadership.forEach((l) => {
           const li = document.createElement("li");
-          // Check for start/end date, otherwise just show congress
           const dateInfo =
             l.startDate && l.endDate
               ? `${l.startDate} - ${l.endDate}`
@@ -485,113 +662,67 @@ document.addEventListener("DOMContentLoaded", () => {
             })` + (dateInfo ? `<br><span>${dateInfo}</span>` : "");
           leadershipHistoryList.appendChild(li);
         });
-      } else if (leadershipHistoryList) {
+      } else {
         leadershipHistoryList.innerHTML =
           "<li>No leadership history available.</li>";
       }
+    }
 
-      // --- Photo & Attribution ---
-      let imageUrl = `https://bioguide.congress.gov/bioguide/photo/${details.bioguide_id[0]}/${details.bioguide_id}.jpg`;
+    // -- Photo --
+    if (memberPhoto && photoLoadingError && photoAttribution) {
+      let imageUrl = null;
       let attributionText = "";
       if (details.depiction?.imageUrl) {
         imageUrl = details.depiction.imageUrl;
         attributionText = details.depiction.attribution || "";
+      } else if (details.bioguide_id) {
+        imageUrl = `https://bioguide.congress.gov/bioguide/photo/${details.bioguide_id[0]}/${details.bioguide_id}.jpg`;
+        attributionText = "Bioguide Photo";
       }
-      if (details.bioguide_id && memberPhoto && photoLoadingError) {
+
+      photoLoadingError.style.display = "none";
+      photoLoadingError.textContent = "";
+      photoAttribution.innerHTML = attributionText;
+
+      if (imageUrl) {
         memberPhoto.src = imageUrl;
         memberPhoto.alt = `Photo of ${details.name || "member"}`;
         memberPhoto.style.display = "block";
-        photoLoadingError.style.display = "none";
-        if (photoAttribution) photoAttribution.innerHTML = attributionText; // Use innerHTML for attribution link
+        memberPhoto.onload = () => {
+          memberPhoto.onerror = null;
+        };
         memberPhoto.onerror = () => {
           memberPhoto.style.display = "none";
-          photoLoadingError.textContent = "No photo";
+          photoLoadingError.textContent = "Photo not available";
           photoLoadingError.style.display = "block";
-          memberPhoto.onerror = null;
-          if (photoAttribution) photoAttribution.textContent = "";
-        };
-        memberPhoto.onload = () => {
-          photoLoadingError.style.display = "none";
+          photoAttribution.textContent = "";
           memberPhoto.onerror = null;
         };
       } else {
-        if (memberPhoto) memberPhoto.style.display = "none";
-        if (photoLoadingError) {
-          photoLoadingError.textContent = details.bioguide_id
-            ? "No photo"
-            : "ID missing";
-          photoLoadingError.style.display = "block";
-        }
-        if (photoAttribution) photoAttribution.textContent = "";
+        memberPhoto.style.display = "none";
+        photoLoadingError.textContent = "Photo not available";
+        photoLoadingError.style.display = "block";
+        photoAttribution.textContent = "";
       }
-    } else {
-      // Handle missing 'details'
-      if (memberDetailsCoreContainer) {
-        memberDetailsCoreContainer.style.display = "block";
-        displayError(
-          memberDetailsCoreContainer,
-          null,
-          data.member_details_error || "Details unavailable."
-        );
-      }
-      if (memberPhoto) memberPhoto.style.display = "none";
-      if (photoLoadingError) photoLoadingError.style.display = "none";
-      if (photoAttribution) photoAttribution.textContent = "";
-      if (termHistoryList)
-        termHistoryList.innerHTML = "<li>Err loading history.</li>";
-      if (partyHistoryList)
-        partyHistoryList.innerHTML = "<li>Err loading history.</li>";
-      if (leadershipHistoryList)
-        leadershipHistoryList.innerHTML = "<li>Err loading history.</li>";
     }
-    console.log("Member details, photo & history updated.");
-
-    // --- Legislation Tabs (Keep as before) ---
-    const sponsoredCountSpan = document.getElementById("sponsored-count");
-    const cosponsoredCountSpan = document.getElementById("cosponsored-count");
-    if (sponsoredCountSpan)
-      sponsoredCountSpan.textContent =
-        data.sponsored_count !== undefined ? `(${data.sponsored_count})` : "";
-    if (cosponsoredCountSpan)
-      cosponsoredCountSpan.textContent =
-        data.cosponsored_count !== undefined
-          ? `(${data.cosponsored_count})`
-          : "";
-    [sponsoredItemsStatus, cosponsoredItemsStatus].forEach((sEl, i) => {
-      const lEl = i === 0 ? sponsoredItemsList : cosponsoredItemsList;
-      const items = i === 0 ? data.sponsored_items : data.cosponsored_items;
-      const err =
-        i === 0 ? data.sponsored_items_error : data.cosponsored_items_error;
-      const t = i === 0 ? "sponsored" : "cosponsored";
-      if (lEl && sEl) {
-        lEl.innerHTML = "";
-        sEl.querySelector(".error-message")?.remove();
-        if (err) {
-          displayError(sEl, lEl, err);
-        } else if (items?.length > 0) {
-          try {
-            items.forEach((item) => {
-              if (item) lEl.appendChild(createLegislationListItem(item));
-            });
-          } catch (e) {
-            displayError(sEl, lEl, `Err displaying ${t}.`);
-          }
-        } else {
-          lEl.innerHTML = `<li>No recent ${t}.</li>`;
-        }
-      }
-    });
-    console.log("Display update END");
+    console.log("Member details display update END");
   }
 
-  function clearData() {
+  /** Clears all member-specific data from the display */
+  function clearMemberData() {
+    console.log("Clearing member data display.");
+    currentBioguideId = null; // Clear current member ID
     if (memberInfoDiv) memberInfoDiv.classList.add("hidden");
-    if (memberDetailsCoreContainer) {
-      memberDetailsCoreContainer.innerHTML = "<p>Select member</p>";
-      memberDetailsCoreContainer.classList.remove("loading");
-      memberDetailsCoreContainer.querySelector(".error-message")?.remove();
-      memberDetailsCoreContainer.style.display = "block";
+
+    // Reset loaded flags
+    Object.values(tabDataMap).forEach((tab) => (tab.loaded = false));
+
+    // Clear Details Tab
+    if (memberDetailsStatusDiv) {
+      memberDetailsStatusDiv.classList.remove("loading", "error", "loaded");
+      clearError(memberDetailsStatusDiv); // Ensure error p is cleared
     }
+    if (memberDetailsCoreContainer) memberDetailsCoreContainer.innerHTML = "";
     if (termHistoryList) termHistoryList.innerHTML = "";
     if (partyHistoryList) partyHistoryList.innerHTML = "";
     if (leadershipHistoryList) leadershipHistoryList.innerHTML = "";
@@ -601,78 +732,84 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (photoLoadingError) {
       photoLoadingError.style.display = "none";
-      photoLoadingError.parentNode
-        ?.querySelectorAll(".error-message")
-        .forEach((e) => e.remove());
+      photoLoadingError.textContent = "";
     }
     if (photoAttribution) photoAttribution.textContent = "";
-    [sponsoredItemsStatus, cosponsoredItemsStatus].forEach((div) => {
-      if (div) {
-        div.classList.remove("loading");
-        div.querySelector(".error-message")?.remove();
+
+    // Clear Other Tabs
+    Object.values(tabDataMap).forEach((tabInfo) => {
+      if (tabInfo.statusDiv) {
+        tabInfo.statusDiv.classList.remove("loading", "error");
+        clearError(tabInfo.statusDiv);
       }
+      if (tabInfo.listEl) tabInfo.listEl.innerHTML = "";
+      if (tabInfo.countSpan) tabInfo.countSpan.textContent = "";
     });
-    if (sponsoredItemsList)
-      sponsoredItemsList.innerHTML = "<li>Select member</li>";
-    if (cosponsoredItemsList)
-      cosponsoredItemsList.innerHTML = "<li>Select member</li>";
-    if (tabButtons?.length > 0) switchTab(tabButtons[0]);
-    document
-      .querySelectorAll(".item-count")
-      .forEach((c) => (c.textContent = ""));
+
+    // Reset to details tab visually
+    if (tabButtons?.length > 0) {
+      tabButtons.forEach((b) => b.classList.remove("active"));
+      tabPanes.forEach((p) => p.classList.remove("active"));
+      tabButtons[0].classList.add("active");
+      tabPanes[0].classList.add("active");
+    }
   }
 
-  // --- Event Listeners & Initial Load (Keep exactly as before) ---
-  if (congressFilterSelect)
+  // --- Event Listeners ---
+  if (congressFilterSelect) {
     congressFilterSelect.addEventListener("change", (e) => {
-      const c = e.target.value;
-      if (!c) {
+      const selectedCongress = e.target.value;
+      if (!selectedCongress) {
         memberSelect.innerHTML =
           '<option value="">-- Select Congress --</option>';
         memberSelect.disabled = true;
-        clearData();
+        allMembersData = [];
+        clearMemberData();
         return;
       }
-      currentFilters.congress = c;
-      clearData();
+      currentFilters.congress = selectedCongress;
+      clearMemberData();
       memberSelect.value = "";
-      fetchCongressMembers(c);
+      fetchCongressMembers(selectedCongress);
     });
-  if (memberSelect)
+  }
+
+  if (memberSelect) {
     memberSelect.addEventListener("change", (e) => {
-      fetchMemberDetailData(e.target.value);
+      fetchMemberDetailData(e.target.value); // Fetch details for the selected member
     });
+  }
+
+  // Filter Listeners (Name, Party, Chamber, State) - No changes needed, they re-populate dropdown
   if (nameSearchInput) {
-    let dt;
+    let debounceTimeout;
     nameSearchInput.addEventListener("input", (e) => {
-      clearTimeout(dt);
-      dt = setTimeout(() => {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(() => {
         currentFilters.name = e.target.value;
         populateMemberDropdown();
         memberSelect.value = "";
-        if (!memberInfoDiv?.classList.contains("hidden")) clearData();
+        // Don't clear member data on filter change, only on new selection or congress change
       }, 300);
     });
   }
   if (partyFilters.length > 0)
-    partyFilters.forEach((r) =>
-      r.addEventListener("change", (e) => {
+    partyFilters.forEach((radio) =>
+      radio.addEventListener("change", (e) => {
         if (e.target.checked) {
           currentFilters.party = e.target.value;
           populateMemberDropdown();
           memberSelect.value = "";
-          if (!memberInfoDiv?.classList.contains("hidden")) clearData();
         }
       })
     );
   if (chamberFilters.length > 0)
-    chamberFilters.forEach((r) =>
-      r.addEventListener("change", (e) => {
+    chamberFilters.forEach((radio) =>
+      radio.addEventListener("change", (e) => {
         if (e.target.checked) {
           currentFilters.chamber = e.target.value;
           populateMemberDropdown();
           memberSelect.value = "";
-          if (!memberInfoDiv?.classList.contains("hidden")) clearData();
         }
       })
     );
@@ -681,19 +818,41 @@ document.addEventListener("DOMContentLoaded", () => {
       currentFilters.state = e.target.value;
       populateMemberDropdown();
       memberSelect.value = "";
-      if (!memberInfoDiv?.classList.contains("hidden")) clearData();
     });
-  if (tabButtons.length > 0)
-    tabButtons.forEach((b) => b.addEventListener("click", () => switchTab(b)));
-  clearData();
+
+  // Tab Button Clicks - Now uses switchTab which handles lazy loading
+  if (tabButtons.length > 0) {
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => switchTab(button));
+    });
+  }
+
+  // --- Initial Load ---
+  clearMemberData();
   const initialCongressValue = congressFilterSelect
     ? congressFilterSelect.value
     : null;
-  if (initialCongressValue) {
+  if (
+    initialCongressValue &&
+    initialCongressValue === String(initialCongress)
+  ) {
     currentFilters.congress = initialCongressValue;
     fetchCongressMembers(initialCongressValue);
+  } else if (initialCongress) {
+    console.warn(
+      "Mismatch between filter value and initialCongress. Forcing load for:",
+      initialCongress
+    );
+    if (congressFilterSelect) congressFilterSelect.value = initialCongress;
+    currentFilters.congress = initialCongress;
+    fetchCongressMembers(initialCongress);
   } else {
+    console.error("Initial congress value not available.");
     memberSelect.innerHTML = '<option value="">-- Select Congress --</option>';
     memberSelect.disabled = true;
+    memberListError.textContent = "Select Congress.";
+    memberListError.style.display = "inline-block";
   }
+
+  console.log("CivicTrack Initialized.");
 }); // End DOMContentLoaded
