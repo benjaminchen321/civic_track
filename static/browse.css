@@ -202,3 +202,42 @@
   margin-left: 8px;
   font-style: italic;
 }
+
+/* Nomination List Styles */
+#nominations-list li {
+  padding: 10px 5px;
+  border-bottom: 1px solid var(--border-color);
+  line-height: 1.4;
+}
+#nominations-list li:last-child {
+  border-bottom: none;
+}
+#nominations-list .nom-identifier a,
+#nominations-list .nom-identifier strong {
+  font-weight: 600;
+  margin-right: 5px;
+}
+#nominations-list .nom-identifier a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+#nominations-list .nom-identifier a:hover {
+  text-decoration: underline;
+  color: var(--primary-hover);
+}
+#nominations-list .nom-org {
+  font-style: italic;
+  color: var(--text-muted);
+}
+#nominations-list .nom-meta {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+#nominations-list .nom-latest-action {
+  display: block; /* Put on new line */
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-top: 3px;
+  padding-left: 10px;
+}

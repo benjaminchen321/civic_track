@@ -103,6 +103,89 @@
   gap: 25px;
 }
 
+/* Nomination Detail Specific */
+.nomination-detail-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  background-color: var(--background-card);
+  padding: 25px 30px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--box-shadow);
+}
+
+.nomination-summary-section {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+.nomination-summary-section h2 {
+  margin-top: 0;
+  font-size: 1.6rem;
+  line-height: 1.4;
+}
+.nom-meta {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-bottom: 15px;
+}
+.nom-meta span {
+  margin-right: 5px;
+  margin-left: 5px;
+}
+
+.nominees-section {
+  margin-top: 20px;
+  border-top: 1px dashed var(--border-color);
+  padding-top: 15px;
+}
+.nominees-section h4 {
+  margin-bottom: 10px;
+}
+.nominees-section ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  font-size: 0.95rem;
+}
+.nominees-section li {
+  margin-bottom: 10px;
+  background-color: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.nominees-section li strong {
+  display: block;
+  margin-bottom: 3px;
+} /* Position on own line */
+.nominees-section li em {
+  font-size: 0.9em;
+  color: #555;
+} /* Style count/part */
+.explore-link {
+  margin-top: 15px;
+  font-size: 0.9em;
+}
+
+.description {
+  margin-top: 15px;
+}
+.description h4 {
+  margin-bottom: 5px;
+}
+.description p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.nomination-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 25px;
+}
+
 .detail-item h4 {
   margin-top: 0;
   font-size: 1.1rem;
@@ -226,6 +309,34 @@
   margin-left: 5px;
 }
 
+.partition-notice {
+  background-color: #fff3cd; /* Light yellow */
+  border: 1px solid #ffeeba;
+  color: #856404;
+  padding: 10px 15px;
+  border-radius: var(--border-radius);
+  margin: 15px 0;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.latest-action.no-action {
+  font-style: italic;
+  color: var(--text-muted);
+  padding: 10px 15px;
+  margin-bottom: 15px;
+  background-color: var(--background-light);
+  border-radius: var(--border-radius);
+  border-left: 4px solid var(--text-muted);
+}
+
+.detail-item h4 .api-note {
+  font-size: 0.8em;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 5px;
+}
+
 /* Keep generic detail-item h4 styling */
 .detail-item h4 {
   margin-top: 0;
@@ -245,8 +356,9 @@
   overflow-y: auto;
 }
 .detail-item p {
-  /* Styling for "No subcommittees" text */
-  font-size: 0.9rem;
-  margin-top: 5px;
+  /* Style explanation text */
+  font-size: 0.85em;
   color: var(--text-muted);
+  margin-top: 8px;
+  font-style: italic;
 }

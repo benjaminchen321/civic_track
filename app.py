@@ -820,6 +820,138 @@ def get_committee_details(chamber, committee_code):
     return {"committee": committee_data, "error": None}
 
 
+@cache.memoize(timeout=1800)  # Cache nomination lists for 30 mins
+def get_nominations_list(congress=None, offset=0, limit=20):
+    """Fetches a list of nominations, optionally filtered by Congress."""
+    print(
+        f"Fetching nominations list: Congress={congress}, Offset={offset}, Limit={limit}"
+    )
+
+    # Determine the correct API endpoint path
+    if congress:
+        endpoint = f"/nomination/{congress}"
+    else:
+        endpoint = "/nomination"  # List all nominations across congresses
+
+    params = {"offset": offset, "limit": limit}
+    # Note: API docs don't specify sort for nominations, relies on default (date received)
+    data, error = _make_api_request(endpoint, params=params)
+
+    if error:
+        return {"nominations": [], "pagination": None, "error": error}
+    if not data or not isinstance(data.get("nominations"), list):
+        err_msg = (
+            data.get("message", "Invalid nomination list format from API.")
+            if isinstance(data, dict)
+            else "Invalid nomination list format from API."
+        )
+        return {"nominations": [], "pagination": None, "error": err_msg}
+
+    # Add internal detail page link to each nomination
+    processed_nominations = []
+    for nom in data.get("nominations", []):
+        if isinstance(nom, dict):
+            nom_cong = nom.get("congress")
+            nom_num = nom.get("number")
+            if nom_cong is not None and nom_num is not None:
+                nom["detailPageUrl"] = f"/nomination/{nom_cong}/{nom_num}"
+                # Construct direct congress.gov link
+                nom["congressDotGovUrl"] = (
+                    f"https://www.congress.gov/nomination/{nom_cong}th-congress/{nom_num}"
+                )
+            else:
+                nom["detailPageUrl"] = None
+                nom["congressDotGovUrl"] = None
+            processed_nominations.append(nom)
+
+    return {
+        "nominations": processed_nominations,
+        "pagination": data.get("pagination"),
+        "error": None,
+    }
+
+
+@cache.memoize(timeout=7200)  # Cache nomination details for 2 hours
+def get_nomination_details(congress, nomination_number):
+    """Fetches detailed information for a specific nomination."""
+    print(f"Fetching nomination details for: {congress}/{nomination_number}")
+
+    endpoint = f"/nomination/{congress}/{nomination_number}"
+    data, error = _make_api_request(endpoint)
+
+    if error:
+        return {"nomination": None, "error": error}
+    if not data or not isinstance(data.get("nomination"), dict):
+        err_msg = (
+            data.get("message", "Invalid nomination detail format from API.")
+            if isinstance(data, dict)
+            else "Invalid nomination detail format from API."
+        )
+        return {"nomination": None, "error": err_msg}
+
+    nomination_data = data["nomination"]
+
+    # Add direct congress.gov link
+    nom_cong = nomination_data.get("congress")
+    nom_num = nomination_data.get("number")
+    if nom_cong is not None and nom_num is not None:
+        nomination_data["congressDotGovUrl"] = (
+            f"https://www.congress.gov/nomination/{nom_cong}th-congress/{nom_num}"
+        )
+    else:
+        nomination_data["congressDotGovUrl"] = None
+
+    # --- Optionally fetch sub-resources like actions or committees ---
+    # Example: Fetch Actions (limited)
+    actions_data = None
+    actions_url_info = nomination_data.get("actions", {})
+    if isinstance(actions_url_info, dict) and actions_url_info.get("url"):
+        actions_endpoint = urlparse(actions_url_info.get("url")).path
+        action_resp_data, action_error = _make_api_request(
+            actions_endpoint, params={"limit": 50}
+        )
+        if action_error:
+            print(
+                f"Warn: Failed to fetch actions for nomination {congress}/{nomination_number}: {action_error}"
+            )
+        elif action_resp_data and "actions" in action_resp_data:
+            actions_data = action_resp_data["actions"]
+
+    # Example: Fetch Committees (limited) - URL may not always exist
+    committees_data = None
+    committees_url_info = nomination_data.get("committees", {})
+    if isinstance(committees_url_info, dict) and committees_url_info.get("url"):
+        committees_endpoint = urlparse(committees_url_info.get("url")).path
+        committee_resp_data, committee_error = _make_api_request(
+            committees_endpoint, params={"limit": 10}
+        )
+        if committee_error:
+            print(
+                f"Warn: Failed to fetch committees for nomination {congress}/{nomination_number}: {committee_error}"
+            )
+        elif committee_resp_data and "committees" in committee_resp_data:
+            # We might want to link these committees internally
+            committees_raw = committee_resp_data["committees"]
+            linked_committees = []
+            for comm in committees_raw:
+                if isinstance(comm, dict):
+                    comm_chamber = comm.get("chamber")
+                    comm_code = comm.get("systemCode")
+                    if comm_chamber and comm_code:
+                        comm["detailPageUrl"] = (
+                            f"/committee/{comm_chamber.lower()}/{comm_code}"
+                        )
+                    linked_committees.append(comm)
+            committees_data = linked_committees
+
+    return {
+        "nomination": nomination_data,
+        "actions": actions_data,  # Add fetched actions
+        "committees": committees_data,  # Add fetched committees
+        "error": None,
+    }
+
+
 # --- Load Initial Data ---
 print("Fetching initial Congress list...")
 AVAILABLE_CONGRESSES = get_congress_list()
@@ -1297,6 +1429,76 @@ def committee_detail_page(chamber, committee_code):
         error=None,
         chamber_arg=chamber_lower,
     )  # Pass the validated lower-case chamber
+
+
+@app.route("/nominations")
+def nominations_page():
+    """Serves the HTML page for browsing nominations."""
+    print("Serving browse nominations page...")
+    return render_template(
+        "browse_nominations.html",
+        congresses=AVAILABLE_CONGRESSES,
+        current_congress=DEFAULT_CONGRESS,
+    )
+
+
+@app.route("/api/nominations")
+def get_nominations_list_api():
+    """API endpoint to fetch list of nominations."""
+    congress = request.args.get("congress", default=None, type=str)
+    offset = request.args.get("offset", default=0, type=int)
+    limit = request.args.get("limit", default=25, type=int)
+
+    # Validate Congress (optional)
+    if congress:
+        valid_congress_numbers = [
+            c.get("number") for c in AVAILABLE_CONGRESSES if isinstance(c, dict)
+        ]
+        if not congress.isdigit() or int(congress) not in valid_congress_numbers:
+            print(f"Warning: Invalid congress '{congress}', ignoring.")
+            congress = None  # Treat invalid as no filter
+
+    if limit > 100 or limit < 1:
+        limit = 25
+    if offset < 0:
+        offset = 0
+
+    result = get_nominations_list(congress=congress, offset=offset, limit=limit)
+
+    status_code = 500 if result.get("error") else 200
+    if result.get("error") and "API HTTP 404" in result["error"]:
+        status_code = 404
+
+    return jsonify(result), status_code
+
+
+# --- NEW: Nomination Detail Route ---
+@app.route("/nomination/<int:congress>/<int:nomination_number>")
+def nomination_detail_page(congress, nomination_number):
+    """Serves the detail page for a specific nomination."""
+    print(f"Serving detail page for Nomination: PN{nomination_number}-{congress}")
+
+    # Fetch nomination details (includes actions/committees now)
+    data = get_nomination_details(congress, nomination_number)
+
+    if data.get("error"):
+        err_msg = data["error"]
+        if "not found" in err_msg.lower() or "404" in err_msg:
+            abort(
+                404,
+                description=f"Nomination PN{nomination_number}-{congress} not found.",
+            )
+        else:
+            return render_template(
+                "nomination_detail.html",
+                data=None,
+                error=f"Error fetching nomination details: {err_msg}",
+            )
+
+    if not data.get("nomination"):
+        abort(500, description="Failed to retrieve nomination data structure.")
+
+    return render_template("nomination_detail.html", data=data, error=None)
 
 
 # --- Main Execution ---
