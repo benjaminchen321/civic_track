@@ -1,0 +1,145 @@
+/* FILE: static/detail.css */
+.page-header {
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+}
+.page-header h1 {
+    margin: 0;
+    font-size: 2rem;
+}
+.page-header .congress-tag {
+    font-size: 0.8em;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-left: 10px;
+}
+.page-header nav a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    margin-left: 10px;
+}
+.page-header nav a:hover {
+    text-decoration: underline;
+    color: var(--primary-hover);
+}
+
+.container {
+    max-width: 1000px; /* Limit width for readability */
+    margin: 0 auto; /* Center container */
+    background-color: var(--background-card);
+    padding: 25px 30px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--box-shadow);
+}
+
+.error-container {
+    text-align: center;
+}
+
+.bill-summary-section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+.bill-summary-section h2 {
+    margin-top: 0;
+    font-size: 1.6rem;
+    line-height: 1.4;
+}
+.bill-meta {
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin-bottom: 15px;
+}
+.bill-meta span, .bill-meta a {
+    margin-right: 5px;
+    margin-left: 5px;
+}
+.bill-meta a {
+     color: var(--primary-color);
+     text-decoration: none;
+}
+.bill-meta a:hover {
+     text-decoration: underline;
+}
+
+.latest-action {
+    font-size: 0.95em;
+    background-color: var(--background-light);
+    padding: 10px 15px;
+    border-radius: var(--border-radius);
+    margin-bottom: 15px;
+    border-left: 4px solid var(--primary-color);
+}
+.latest-action strong {
+     color: var(--text-color);
+}
+
+.summary-text {
+    font-size: 0.95em;
+    line-height: 1.6;
+    max-height: 300px; /* Limit initial height */
+    overflow-y: auto; /* Add scroll if long */
+    border: 1px solid var(--background-control);
+    padding: 10px;
+    border-radius: var(--border-radius);
+    background-color: #fdfdfd;
+}
+
+.bill-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Responsive columns */
+    gap: 25px;
+}
+
+.detail-item h4 {
+    margin-top: 0;
+    font-size: 1.1rem;
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.detail-item ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.9rem;
+    max-height: 250px; /* Limit height of lists */
+    overflow-y: auto;
+}
+.detail-item li {
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--background-light);
+}
+.detail-item li:last-child {
+    border-bottom: none;
+}
+.detail-item p {
+     font-size: 0.9rem;
+     margin-top: 5px;
+}
+.detail-item a {
+     color: var(--primary-color);
+     text-decoration: none;
+}
+.detail-item a:hover {
+     text-decoration: underline;
+}
+
+.action-list strong { font-weight: 600; }
+.action-list .vote-links { font-size: 0.9em; margin-left: 8px; color: var(--text-muted); }
+.action-list .vote-links a { margin-left: 4px; }
+
+.cosponsor-list .member-link-internal {
+    /* Basic styling for internal link, can be enhanced */
+    font-weight: 500;
+}

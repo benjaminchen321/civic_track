@@ -1,0 +1,174 @@
+/* FILE: static/browse.css */
+.page-header {
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap; /* Allow wrapping on small screens */
+}
+.page-header h1 {
+  margin: 0;
+  font-size: 2rem; /* Slightly smaller than main h1 */
+}
+.page-header nav a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+.page-header nav a:hover {
+  text-decoration: underline;
+  color: var(--primary-hover);
+}
+
+#browse-controls {
+  background-color: var(--background-card);
+  padding: 15px 20px;
+  border-radius: var(--border-radius);
+  margin-bottom: 25px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--box-shadow);
+}
+.browse-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.browse-filter-group label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.browse-filter-group select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 0.9rem;
+  background-color: var(--background-light);
+  min-width: 150px; /* Give selects some minimum width */
+}
+#apply-filters-btn {
+  padding: 0.5rem 1rem;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+#apply-filters-btn:hover {
+  background-color: var(--primary-hover);
+}
+
+#bills-list-container {
+  background-color: var(--background-card);
+  padding: 20px 25px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--box-shadow);
+}
+#bills-list-container h2 {
+  margin-top: 0;
+  border-bottom: none; /* Remove default h2 border */
+  padding-bottom: 0;
+  margin-bottom: 15px;
+}
+
+/* Style for the suffix added to the H2 title */
+#results-title-suffix {
+  font-size: 0.7em;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 10px;
+}
+
+#bills-list-status {
+  position: relative;
+  min-height: 50px; /* Space for loader/error */
+}
+#bills-list-status .loader {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+#bills-list-status:not(.loading) .loader {
+  display: none;
+}
+#bills-list-status .error-message {
+  margin-top: 0;
+} /* Adjust margin */
+
+#bills-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+#bills-list li {
+  padding: 12px 5px;
+  border-bottom: 1px solid var(--border-color);
+  line-height: 1.5;
+}
+#bills-list li:last-child {
+  border-bottom: none;
+}
+
+#bills-list .bill-identifier a {
+  font-weight: 600;
+  color: var(--primary-color);
+  text-decoration: none;
+  margin-right: 5px;
+}
+#bills-list .bill-identifier a:hover {
+  text-decoration: underline;
+  color: var(--primary-hover);
+}
+#bills-list .bill-title {
+  font-weight: 500;
+}
+#bills-list .bill-meta {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-left: 5px;
+}
+#bills-list .bill-latest-action {
+  display: block;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-top: 3px;
+  padding-left: 10px;
+}
+
+#pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-color);
+}
+#pagination-controls button {
+  padding: 0.4rem 0.8rem;
+  background-color: var(--background-control);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+#pagination-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+#pagination-controls button:not(:disabled):hover {
+  background-color: #d4d8db;
+}
+#page-info {
+  font-size: 0.9em;
+  color: var(--text-muted);
+}

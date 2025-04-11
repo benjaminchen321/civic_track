@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {% if bill_data and bill_data.bill %}
+    <title>
+      {{ bill_data.bill.type }}{{ bill_data.bill.number }}: {{
+      bill_data.bill.title }} - CivicTrack
+    </title>
+    {% else %}
+    <title>Bill Detail - CivicTrack</title>
+    {% endif %}
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='detail.css') }}"
+    />
+    <!-- Specific styles -->
+  </head>
+  <body>
+    <header class="page-header">
+      {% if bill_data and bill_data.bill %}
+      <h1>
+        {{ bill_data.bill.type }}{{ bill_data.bill.number }}
+        <span class="congress-tag"
+          >({{ bill_data.bill.congress }}th Congress)</span
+        >
+      </h1>
+      {% else %}
+      <h1>Bill Detail</h1>
+      {% endif %}
+      <nav>
+        <a href="{{ url_for('bills_page') }}">« Back to Browse Bills</a> |
+        <a href="{{ url_for('index') }}">Member Search</a>
+      </nav>
+    </header>
+
+    {% if error %}
+    <div class="container error-container">
+      <h2>Error Loading Bill</h2>
+      <p class="error-message visible">{{ error }}</p>
+    </div>
+    {% elif bill_data and bill_data.bill %} {% set bill = bill_data.bill %}
+    <div class="container bill-detail-container">
+      <section class="bill-summary-section">
+        <h2>{{ bill.title }}</h2>
+        <div class="bill-meta">
+          <span
+            ><strong>Introduced:</strong> {{ bill.introducedDate or 'N/A'
+            }}</span
+          >
+          |
+          <span
+            ><strong>Origin:</strong> {{ bill.originChamber or 'N/A' }}</span
+          >
+          {% if bill.policyArea %} |
+          <span><strong>Policy Area:</strong> {{ bill.policyArea.name }}</span
+          >{% endif %} {% if bill.congressDotGovUrl %} |
+          <a
+            href="{{ bill.congressDotGovUrl }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            >View on Congress.gov</a
+          >
+          {% endif %}
+        </div>
+
+        {% if bill.latestAction %}
+        <div class="latest-action">
+          <strong>Latest Action:</strong> ({{ bill.latestAction.actionDate or
+          'N/A' }}) {{ bill.latestAction.text or 'N/A' }}
+        </div>
+        {% endif %} {% if bill_data.summaries and bill_data.summaries|length > 0
+        %}
+        <h4>Latest Summary</h4>
+        {# Display the first summary for now #}
+        <div class="summary-text">{{ bill_data.summaries[0].text | safe }}</div>
+        {% elif bill.summaries and bill.summaries.count > 0 %}
+        <p>
+          <a
+            href="{{ bill.summaries.url | replace('?format=json', '') }}"
+            target="_blank"
+            >View {{ bill.summaries.count }} Summaries on Congress.gov</a
+          >
+        </p>
+        {% else %}
+        <p>No summaries available.</p>
+        {% endif %}
+      </section>
+
+      <section class="bill-details-grid">
+        {# Display counts and links to sub-resources #}
+        <div class="detail-item">
+          <h4>Actions ({{ bill.actions.count or 0 }})</h4>
+          {% if bill_data.actions and bill_data.actions|length > 0 %}
+          <ul class="action-list">
+            {% for action in bill_data.actions %}
+            <li>
+              <strong>{{ action.actionDate }}:</strong> {{ action.text }} {% if
+              action.recordedVotes %}
+              <span class="vote-links">
+                (Votes: {% for vote in action.recordedVotes %}
+                <a href="{{ vote.url }}" target="_blank"
+                  >{{ vote.chamber }} #{{ vote.rollNumber }}</a
+                >{% if not loop.last %}, {% endif %} {% endfor %} )</span
+              >
+              {% endif %}
+            </li>
+            {% endfor %} {% if bill.actions.count > bill_data.actions|length %}
+            <li>
+              <a
+                href="{{ bill.actions.url | replace('?format=json', '') }}"
+                target="_blank"
+                >View all {{ bill.actions.count }} actions...</a
+              >
+            </li>
+            {% endif %}
+          </ul>
+          {% elif bill.actions and bill.actions.count > 0 %}
+          <p>
+            <a
+              href="{{ bill.actions.url | replace('?format=json', '') }}"
+              target="_blank"
+              >View Actions on Congress.gov</a
+            >
+          </p>
+          {% else %}
+          <p>No actions recorded.</p>
+          {% endif %}
+        </div>
+
+        <div class="detail-item">
+          <h4>Cosponsors ({{ bill.cosponsors.count or 0 }})</h4>
+          {% if bill_data.cosponsors and bill_data.cosponsors|length > 0 %}
+          <ul class="cosponsor-list">
+            {% for cs in bill_data.cosponsors %}
+            <li>
+              <a
+                href="{{ url_for('get_member_details_api', bioguide_id=cs.bioguideId) }}"
+                class="member-link-internal"
+                >{{ cs.fullName }}</a
+              >
+              ({{ cs.sponsorshipDate }}{% if cs.sponsorshipWithdrawnDate %} -
+              Withdrawn {{cs.sponsorshipWithdrawnDate}}{% endif %})
+            </li>
+            {% endfor %} {% if bill.cosponsors.count >
+            bill_data.cosponsors|length %}
+            <li>
+              <a
+                href="{{ bill.cosponsors.url | replace('?format=json', '') }}"
+                target="_blank"
+                >View all {{ bill.cosponsors.count }} cosponsors...</a
+              >
+            </li>
+            {% endif %}
+          </ul>
+          {% elif bill.cosponsors and bill.cosponsors.count > 0 %}
+          <p>
+            <a
+              href="{{ bill.cosponsors.url | replace('?format=json', '') }}"
+              target="_blank"
+              >View Cosponsors on Congress.gov</a
+            >
+          </p>
+          {% else %}
+          <p>No cosponsors.</p>
+          {% endif %}
+        </div>
+
+        <div class="detail-item">
+          <h4>Committees ({{ bill.committees.count or 0 }})</h4>
+          {% if bill.committees and bill.committees.count > 0 %} {# TODO: Fetch
+          and display committee details if needed #}
+          <p>
+            <a
+              href="{{ bill.committees.url | replace('?format=json', '') }}"
+              target="_blank"
+              >View Committee Info on Congress.gov</a
+            >
+          </p>
+          {% else %}
+          <p>No committee referrals listed.</p>
+          {% endif %}
+        </div>
+
+        <div class="detail-item">
+          <h4>Related Bills ({{ bill.relatedBills.count or 0 }})</h4>
+          {% if bill.relatedBills and bill.relatedBills.count > 0 %}
+          <p>
+            <a
+              href="{{ bill.relatedBills.url | replace('?format=json', '') }}"
+              target="_blank"
+              >View Related Bills on Congress.gov</a
+            >
+          </p>
+          {% else %}
+          <p>No related bills listed.</p>
+          {% endif %}
+        </div>
+
+        <div class="detail-item">
+          <h4>Amendments ({{ bill.amendments.count or 0 }})</h4>
+          {% if bill.amendments and bill.amendments.count > 0 %}
+          <p>
+            <a
+              href="{{ bill.amendments.url | replace('?format=json', '') }}"
+              target="_blank"
+              >View Amendments on Congress.gov</a
+            >
+          </p>
+          {% else %}
+          <p>No amendments listed.</p>
+          {% endif %}
+        </div>
+
+        <div class="detail-item">
+          <h4>Text Versions ({{ bill.textVersions.count or 0 }})</h4>
+          {% if bill.textVersions and bill.textVersions.count > 0 %}
+          <p>
+            <a
+              href="{{ bill.textVersions.url | replace('?format=json', '') }}"
+              target="_blank"
+              >View Text Versions on Congress.gov</a
+            >
+          </p>
+          {% else %}
+          <p>No text versions listed.</p>
+          {% endif %}
+        </div>
+        {# Add more sections for Laws, CBO Estimates, Titles etc. as needed #}
+      </section>
+    </div>
+    {% else %}
+    <div class="container">
+      <h2>Bill Not Found</h2>
+      <p>
+        The requested bill could not be found or there was an error loading its
+        data.
+      </p>
+    </div>
+    {% endif %}
+  </body>
+</html>

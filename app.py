@@ -2,7 +2,7 @@
 import os
 import json
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, abort
 from flask_caching import Cache
 from urllib.parse import urlparse
 
@@ -98,6 +98,93 @@ def _make_api_request(endpoint, params=None, timeout=15):
         error_msg = f"Generic API Error for {endpoint}: {e}"
         print(f"ERROR: {error_msg}")
         return None, error_msg
+
+
+# --- Bill/Amendment Detail Fetching ---
+# get_bill_details: Keep existing (used for lists)
+# get_amendment_details: Keep existing (used for lists)
+
+
+# --- NEW: Function for Full Bill Data ---
+@cache.memoize(timeout=7200)  # Cache full details for 2 hours
+def get_full_bill_data(congress, bill_type, bill_number):
+    """Fetches more comprehensive data for the bill detail page."""
+    print(f"Fetching FULL details for Bill: {congress}-{bill_type}-{bill_number}")
+    bill_type_lower = bill_type.lower()
+    if bill_type_lower not in BILL_TYPES:
+        return {"error": f"Invalid bill type: {bill_type}", "bill": None}
+
+    base_endpoint = f"/bill/{congress}/{bill_type_lower}/{bill_number}"
+    full_data = {
+        "bill": None,
+        "actions": None,
+        "cosponsors": None,
+        "committees": None,
+        "summaries": None,
+        "relatedBills": None,
+        "error": None,
+    }
+
+    # 1. Get Base Bill Info (contains links to sub-resources)
+    base_data, error = _make_api_request(base_endpoint)
+    if error or not base_data or "bill" not in base_data:
+        full_data["error"] = error or "Bill base data not found or invalid format."
+        print(
+            f"Error fetching base details for {congress}-{bill_type}-{bill_number}: {full_data['error']}"
+        )
+        return full_data
+
+    full_data["bill"] = base_data["bill"]  # Store the main bill object
+
+    # --- Optionally Fetch Sub-Resources (Example for Actions & Cosponsors) ---
+    # For performance, only fetch if needed, or fetch limited amounts initially.
+    # We'll fetch a small number here as an example.
+
+    # Fetch Actions
+    actions_url = full_data["bill"].get("actions", {}).get("url")
+    if actions_url:
+        actions_endpoint = urlparse(actions_url).path
+        actions_data, actions_error = _make_api_request(
+            actions_endpoint, params={"limit": 50}
+        )  # Get recent actions
+        if actions_error:
+            print(f"Warn: Failed to fetch actions for {base_endpoint}: {actions_error}")
+            # Store error or empty list? Let's store empty for now.
+            full_data["actions"] = []
+        elif actions_data and "actions" in actions_data:
+            full_data["actions"] = actions_data["actions"]
+        else:
+            full_data["actions"] = []  # Store empty list if structure unexpected
+
+    # Fetch Cosponsors
+    cosponsors_url = full_data["bill"].get("cosponsors", {}).get("url")
+    if cosponsors_url:
+        cosponsors_endpoint = urlparse(cosponsors_url).path
+        cosponsors_data, cosponsors_error = _make_api_request(
+            cosponsors_endpoint, params={"limit": 50}
+        )  # Get some cosponsors
+        if cosponsors_error:
+            print(
+                f"Warn: Failed to fetch cosponsors for {base_endpoint}: {cosponsors_error}"
+            )
+            full_data["cosponsors"] = []
+        elif cosponsors_data and "cosponsors" in cosponsors_data:
+            full_data["cosponsors"] = cosponsors_data["cosponsors"]
+        else:
+            full_data["cosponsors"] = []
+
+    # TODO: Add similar fetches for committees, summaries, relatedBills, text, titles if needed
+
+    # Add congress.gov URL to main bill data for template convenience
+    if full_data["bill"]:
+        path_segment_key = full_data["bill"].get("type")
+        path_segment = billTypePaths.get(path_segment_key)
+        item_url = None
+        if path_segment:
+            item_url = f"https://www.congress.gov/bill/{congress}th-congress/{path_segment}/{bill_number}"
+        full_data["bill"]["congressDotGovUrl"] = item_url
+
+    return full_data
 
 
 # --- Helper Functions ---
@@ -622,7 +709,9 @@ def get_congress_list():
                     if num_str.isdigit():
                         num = int(num_str)
                 except Exception as e:
-                    print(f"Warn: Error parsing congress number from name '{name}': {e}")
+                    print(
+                        f"Warn: Error parsing congress number from name '{name}': {e}"
+                    )
                     pass
             if num is None and "url" in item:
                 try:
@@ -630,7 +719,9 @@ def get_congress_list():
                     if url_path and url_path[-1].isdigit():
                         num = int(url_path[-1])
                 except Exception as e:
-                    print(f"Warn: Error parsing congress number from URL '{item['url']}': {e}")
+                    print(
+                        f"Warn: Error parsing congress number from URL '{item['url']}': {e}"
+                    )
                     pass
             if num is not None:
                 item["number"] = num
@@ -844,15 +935,192 @@ def get_member_cosponsored_api(bioguide_id):
     return jsonify(cosponsored_data), status
 
 
-# --- Placeholder routes (Keep as is) ---
+# Page Route
 @app.route("/bills")
 def bills_page():
-    return "Bills Page - Not Implemented", 501
+    """Serves the HTML page for browsing bills."""
+    print("Serving browse bills page...")
+    # Get available bill types for the filter dropdown
+    bill_types_list = [
+        {"code": k, "name": k.upper()} for k in sorted(BILL_TYPES)
+    ]  # Simple list for now
+    return render_template(
+        "browse_bills.html",
+        congresses=AVAILABLE_CONGRESSES,
+        current_congress=DEFAULT_CONGRESS,
+        bill_types=bill_types_list,
+    )
 
 
+# API Route
+@app.route("/api/bills")
+def get_bills_list_api():
+    """API endpoint to fetch list of bills based on filters, using correct API paths."""
+    # Read arguments with defaults
+    congress = request.args.get("congress", default=None, type=str)
+    bill_type = request.args.get(
+        "billType", default=None, type=str
+    )  # Can be None/empty for "All Types"
+    offset = request.args.get("offset", default=0, type=int)
+    limit = request.args.get("limit", default=20, type=int)  # Default to 20 per page
+    # <<< REMOVED: sort parameter reading >>>
+
+    # --- Validation ---
+    valid_congress_numbers = [
+        c.get("number") for c in AVAILABLE_CONGRESSES if isinstance(c, dict)
+    ]
+
+    # Congress is required for filtering beyond the base /bill endpoint
+    if (
+        not congress
+        or not congress.isdigit()
+        or int(congress) not in valid_congress_numbers
+    ):
+        # If no valid congress provided, should we default or error?
+        # Let's default to the /bill endpoint (all congresses) if congress isn't specified or valid.
+        # This might be slow, consider requiring congress on the frontend?
+        # For now, let's require it or use default from frontend's perspective.
+        # If the request *specifically* targets /api/bills without a congress param, it implies /bill.
+        # Let's assume frontend *always* sends a congress parameter from now on.
+        if not congress:  # If specifically missing
+            congress = str(DEFAULT_CONGRESS)  # Force default if missing
+            print(f"Warning: No congress provided, using default {DEFAULT_CONGRESS}")
+        elif not congress.isdigit() or int(congress) not in valid_congress_numbers:
+            print(
+                f"Warning: Invalid congress '{congress}', falling back to default {DEFAULT_CONGRESS}"
+            )
+            congress = str(DEFAULT_CONGRESS)
+
+    # Validate optional bill type
+    if bill_type and bill_type.lower() not in BILL_TYPES:
+        print(f"Warning: Invalid billType '{bill_type}', ignoring.")
+        bill_type = None  # Treat invalid type as "All types" for the selected congress
+
+    if limit > 100 or limit < 1:
+        limit = 20  # Sensible limits
+    if offset < 0:
+        offset = 0
+
+    # --- Construct CORRECT Congress.gov API Endpoint Path ---
+    # Based on provided parameters, map to documented endpoints:
+    # GET /bill
+    # GET /bill/{congress}
+    # GET /bill/{congress}/{billType}
+    if congress:
+        endpoint = f"/bill/{congress}"
+        if bill_type:
+            endpoint += f"/{bill_type.lower()}"
+    else:
+        # This case should ideally be prevented by frontend requiring congress selection
+        # or backend defaulting, but as a fallback:
+        endpoint = (
+            "/bill"  # Get all bills across all congresses (potentially very slow)
+        )
+        print("Warning: Fetching from base /bill endpoint (no congress specified).")
+
+    # Parameters for the API call (limit, offset)
+    # Sorting is handled by the API's default (latest action)
+    params = {
+        "limit": limit,
+        "offset": offset,
+        # <<< NO 'sort' parameter >>>
+    }
+
+    print(f"API: Fetching bills list - Endpoint: {endpoint}, Params: {params}")
+    data, error = _make_api_request(endpoint, params=params)
+
+    # --- Response Handling (mostly unchanged, checks structure) ---
+    if error:
+        status_code = 500
+        if error is not None:  # Ensure error is not None before checking content
+            if "API HTTP 404" in error:
+                status_code = 404
+            elif "API Key" in error:
+                status_code = 401  # Check case-insensitively later if needed
+        return jsonify({"error": error, "bills": [], "pagination": None}), status_code
+
+    # Check for valid structure or API message
+    if not data or (not isinstance(data.get("bills"), list) and "message" not in data):
+        err_msg = (
+            data.get("message", "Invalid response format from API.")
+            if isinstance(data, dict)
+            else "Invalid response format from API."
+        )
+        print(f"Error: Invalid API response structure for {endpoint}. Response: {data}")
+        # If the API returns a specific message (like rate limit), pass it through
+        return jsonify({"error": err_msg, "bills": [], "pagination": None}), 500
+
+    # Process bills (add links) - ensure robust access
+    processed_bills = []
+    for bill in data.get("bills", []):  # Use .get with default
+        if isinstance(bill, dict):
+            b_type = bill.get("type")
+            b_num = bill.get("number")
+            b_cong = bill.get("congress")
+            path_segment = billTypePaths.get(b_type)
+            # Construct internal detail page link
+            if b_type and b_num is not None and b_cong is not None:
+                bill["detailPageUrl"] = (
+                    f"/bill/{b_cong}/{b_type}/{b_num}"  # Internal link
+                )
+            else:
+                bill["detailPageUrl"] = None
+            # Construct congress.gov link
+            if path_segment and b_num is not None and b_cong is not None:
+                bill["congressDotGovUrl"] = (
+                    f"https://www.congress.gov/bill/{b_cong}th-congress/{path_segment}/{b_num}"
+                )
+            else:
+                bill["congressDotGovUrl"] = None
+            processed_bills.append(bill)
+
+    # Return data including pagination info
+    return (
+        jsonify(
+            {
+                "bills": processed_bills,
+                "pagination": data.get("pagination"),
+                "error": None,
+            }
+        ),
+        200,
+    )
+
+
+# --- UPDATED: Bill Detail Route ---
 @app.route("/bill/<int:congress>/<bill_type>/<int:bill_number>")
 def bill_detail_page(congress, bill_type, bill_number):
-    return "Bill Detail Page - Not Implemented", 501
+    """Serves the detail page for a specific bill."""
+    print(f"Serving detail page for Bill: {congress}-{bill_type}-{bill_number}")
+
+    # Basic validation
+    bill_type_lower = bill_type.lower()
+    if bill_type_lower not in BILL_TYPES:
+        abort(404, description="Invalid bill type provided.")
+
+    # Fetch comprehensive data
+    bill_data = get_full_bill_data(congress, bill_type_lower, bill_number)
+
+    if bill_data.get("error"):
+        # Distinguish between 'not found' and other errors
+        err_msg = bill_data["error"]
+        if "not found" in err_msg.lower() or "404" in err_msg:
+            abort(
+                404, description=f"Bill {congress}-{bill_type}-{bill_number} not found."
+            )
+        else:
+            # Render an error page or display error on the detail page?
+            # For now, let's pass the error to the template
+            return render_template(
+                "bill_detail.html",
+                bill_data=None,
+                error=f"Error fetching bill details: {err_msg}",
+            )
+
+    if not bill_data.get("bill"):
+        abort(500, description="Failed to retrieve bill data structure.")
+
+    return render_template("bill_detail.html", bill_data=bill_data, error=None)
 
 
 # --- Main Execution ---

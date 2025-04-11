@@ -66,6 +66,24 @@ h4 {
   padding-bottom: 0.3em;
 }
 
+nav.main-nav {
+  text-align: center;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+nav.main-nav a {
+  margin: 0 15px;
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1.1rem;
+}
+nav.main-nav a:hover {
+  text-decoration: underline;
+  color: var(--primary-hover);
+}
+
 .tab-button .item-count {
   font-size: 0.75em;
   font-weight: 500;
