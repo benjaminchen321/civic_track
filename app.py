@@ -740,6 +740,86 @@ def get_congress_list():
     return congresses_list
 
 
+@cache.memoize(timeout=3600)  # Cache committee lists for 1 hour
+def get_committees_list(congress=None, chamber=None, offset=0, limit=20):
+    """Fetches a list of committees based on optional filters."""
+    print(
+        f"Fetching committees list: Congress={congress}, Chamber={chamber}, Offset={offset}, Limit={limit}"
+    )
+
+    # Determine the correct API endpoint path
+    if congress and chamber:
+        endpoint = f"/committee/{congress}/{chamber.lower()}"
+    elif congress:
+        endpoint = f"/committee/{congress}"
+    elif chamber:
+        endpoint = f"/committee/{chamber.lower()}"
+    else:
+        endpoint = "/committee"  # List all committees
+
+    params = {"offset": offset, "limit": limit}
+    data, error = _make_api_request(endpoint, params=params)
+
+    if error:
+        return {"committees": [], "pagination": None, "error": error}
+    if not data or not isinstance(data.get("committees"), list):
+        err_msg = (
+            data.get("message", "Invalid committee list format from API.")
+            if isinstance(data, dict)
+            else "Invalid committee list format from API."
+        )
+        return {"committees": [], "pagination": None, "error": err_msg}
+
+    # Add internal detail page link to each committee
+    processed_committees = []
+    for committee in data.get("committees", []):
+        if isinstance(committee, dict):
+            comm_chamber = committee.get("chamber")
+            comm_code = committee.get("systemCode")
+            if comm_chamber and comm_code:
+                committee["detailPageUrl"] = (
+                    f"/committee/{comm_chamber.lower()}/{comm_code}"
+                )
+            else:
+                committee["detailPageUrl"] = None
+            processed_committees.append(committee)
+
+    return {
+        "committees": processed_committees,
+        "pagination": data.get("pagination"),
+        "error": None,
+    }
+
+
+@cache.memoize(timeout=7200)  # Cache committee details for 2 hours
+def get_committee_details(chamber, committee_code):
+    """Fetches detailed information for a specific committee."""
+    print(f"Fetching committee details for: {chamber}/{committee_code}")
+    if chamber not in ["house", "senate", "joint"]:
+        return {"committee": None, "error": "Invalid chamber specified."}
+
+    endpoint = f"/committee/{chamber.lower()}/{committee_code}"
+    data, error = _make_api_request(endpoint)
+
+    if error:
+        return {"committee": None, "error": error}
+    if not data or not isinstance(data.get("committee"), dict):
+        err_msg = (
+            data.get("message", "Invalid committee detail format from API.")
+            if isinstance(data, dict)
+            else "Invalid committee detail format from API."
+        )
+        return {"committee": None, "error": err_msg}
+
+    committee_data = data["committee"]
+
+    # Optionally add a direct congress.gov link if derivable
+    # (Requires knowing the base URL structure, which isn't in the API response)
+    # Example: committee_data["congressDotGovUrl"] = f"https://www.congress.gov/committee/{chamber}-committee/{committee_code_maybe_formatted}"
+
+    return {"committee": committee_data, "error": None}
+
+
 # --- Load Initial Data ---
 print("Fetching initial Congress list...")
 AVAILABLE_CONGRESSES = get_congress_list()
@@ -761,40 +841,6 @@ else:
     print(
         f"Available Congresses: {[c.get('number', 'N/A') for c in AVAILABLE_CONGRESSES]}. Default: {DEFAULT_CONGRESS}"
     )
-
-
-# --- Flask Routes ---
-
-
-# Route for fetching the filtered member list
-@app.route("/api/members")
-def get_members_list_data():
-    """API endpoint to fetch member list based on filters."""
-    congress_filter = request.args.get("congress") or (
-        str(DEFAULT_CONGRESS) if DEFAULT_CONGRESS else None
-    )
-    if not congress_filter or not congress_filter.isdigit():
-        if DEFAULT_CONGRESS:
-            congress_filter = str(DEFAULT_CONGRESS)
-        else:
-            return jsonify({"error": "Valid 'congress' query parameter required."}), 400
-
-    print(f"API: Loading members list for congress: {congress_filter}")
-    members_dict = load_congress_members(congress_filter)
-    if not members_dict:
-        is_valid_congress = any(
-            c.get("number") == int(congress_filter)
-            for c in AVAILABLE_CONGRESSES
-            if isinstance(c, dict)
-        )
-        error_msg = (
-            f"Invalid Congress number requested: {congress_filter}."
-            if not is_valid_congress
-            else f"Could not load members for Congress {congress_filter}."
-        )
-        status_code = 400 if not is_valid_congress else 503
-        return jsonify({"error": error_msg}), status_code
-    return jsonify(list(members_dict.values()))
 
 
 # Route for the main page
@@ -874,7 +920,35 @@ def index():
     )
 
 
-# --- NEW: Split API Routes for Member Data ---
+# Route for fetching the filtered member list
+@app.route("/api/members")
+def get_members_list_data():
+    """API endpoint to fetch member list based on filters."""
+    congress_filter = request.args.get("congress") or (
+        str(DEFAULT_CONGRESS) if DEFAULT_CONGRESS else None
+    )
+    if not congress_filter or not congress_filter.isdigit():
+        if DEFAULT_CONGRESS:
+            congress_filter = str(DEFAULT_CONGRESS)
+        else:
+            return jsonify({"error": "Valid 'congress' query parameter required."}), 400
+
+    print(f"API: Loading members list for congress: {congress_filter}")
+    members_dict = load_congress_members(congress_filter)
+    if not members_dict:
+        is_valid_congress = any(
+            c.get("number") == int(congress_filter)
+            for c in AVAILABLE_CONGRESSES
+            if isinstance(c, dict)
+        )
+        error_msg = (
+            f"Invalid Congress number requested: {congress_filter}."
+            if not is_valid_congress
+            else f"Could not load members for Congress {congress_filter}."
+        )
+        status_code = 400 if not is_valid_congress else 503
+        return jsonify({"error": error_msg}), status_code
+    return jsonify(list(members_dict.values()))
 
 
 @app.route("/api/member/<bioguide_id>/details")
@@ -1121,6 +1195,108 @@ def bill_detail_page(congress, bill_type, bill_number):
         abort(500, description="Failed to retrieve bill data structure.")
 
     return render_template("bill_detail.html", bill_data=bill_data, error=None)
+
+
+@app.route("/api/committees")
+def get_committees_list_api():
+    """API endpoint to fetch list of committees based on filters."""
+    congress = request.args.get("congress", default=None, type=str)
+    chamber = request.args.get(
+        "chamber", default=None, type=str
+    )  # Expect 'house', 'senate', 'joint', or None/""
+    offset = request.args.get("offset", default=0, type=int)
+    limit = request.args.get("limit", default=25, type=int)  # Increase default slightly
+
+    # Validate Chamber
+    valid_chambers = ["house", "senate", "joint"]
+    if chamber and chamber.lower() not in valid_chambers:
+        print(f"Warning: Invalid chamber '{chamber}', ignoring.")
+        chamber = None
+
+    # Validate Congress (optional, if provided)
+    if congress:
+        valid_congress_numbers = [
+            c.get("number") for c in AVAILABLE_CONGRESSES if isinstance(c, dict)
+        ]
+        if not congress.isdigit() or int(congress) not in valid_congress_numbers:
+            print(f"Warning: Invalid congress '{congress}', ignoring.")
+            congress = None  # Treat invalid congress as no congress filter
+
+    if limit > 100 or limit < 1:
+        limit = 25
+    if offset < 0:
+        offset = 0
+
+    # Fetch data using the helper function
+    result = get_committees_list(
+        congress=congress, chamber=chamber, offset=offset, limit=limit
+    )
+
+    status_code = 500 if result.get("error") else 200
+    if result.get("error") and "API HTTP 404" in result["error"]:
+        status_code = 404  # Not found (maybe invalid combo?)
+
+    return jsonify(result), status_code
+
+
+# --- NEW: Browse Committees Page Route ---
+@app.route("/committees")
+def committees_page():
+    """Serves the HTML page for browsing committees."""
+    print("Serving browse committees page...")
+    # Provide data needed for filters in the template
+    return render_template(
+        "browse_committees.html",
+        congresses=AVAILABLE_CONGRESSES,
+        current_congress=DEFAULT_CONGRESS,  # For default selection
+        chambers=[  # Provide options for chamber filter
+            {"code": "", "name": "All Chambers"},
+            {"code": "house", "name": "House"},
+            {"code": "senate", "name": "Senate"},
+            {"code": "joint", "name": "Joint"},
+        ],
+    )
+
+
+# --- NEW: Committee Detail Page Route ---
+@app.route("/committee/<chamber>/<committee_code>")
+def committee_detail_page(chamber, committee_code):
+    """Serves the detail page for a specific committee."""
+    print(f"Serving detail page for Committee: {chamber}/{committee_code}")
+
+    chamber_lower = chamber.lower()
+    if chamber_lower not in ["house", "senate", "joint"]:
+        abort(404, description="Invalid chamber specified.")
+    if not committee_code or len(committee_code) < 4:
+        abort(404, description="Invalid committee code format.")
+
+    committee_data = get_committee_details(
+        chamber_lower, committee_code
+    )  # Fetches data
+
+    if committee_data.get("error"):
+        err_msg = committee_data["error"]
+        if "not found" in err_msg.lower() or "404" in err_msg:
+            abort(404, description=f"Committee {chamber}/{committee_code} not found.")
+        else:
+            # Pass the known chamber even on error for consistent header rendering maybe?
+            return render_template(
+                "committee_detail.html",
+                committee=None,
+                error=f"Error fetching committee details: {err_msg}",
+                chamber_arg=chamber_lower,
+            )  # Pass chamber arg
+
+    if not committee_data.get("committee"):
+        abort(500, description="Failed to retrieve committee data structure.")
+
+    # --- Pass committee data AND the chamber argument to the template ---
+    return render_template(
+        "committee_detail.html",
+        committee=committee_data["committee"],
+        error=None,
+        chamber_arg=chamber_lower,
+    )  # Pass the validated lower-case chamber
 
 
 # --- Main Execution ---

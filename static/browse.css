@@ -172,3 +172,33 @@
   font-size: 0.9em;
   color: var(--text-muted);
 }
+/* Committee List Styles */
+#committees-list li {
+  padding: 10px 5px;
+  border-bottom: 1px solid var(--border-color);
+  line-height: 1.4;
+}
+#committees-list li:last-child {
+  border-bottom: none;
+}
+#committees-list .committee-name a {
+  font-weight: 600;
+  color: var(--primary-color);
+  text-decoration: none;
+}
+#committees-list .committee-name a:hover {
+  text-decoration: underline;
+  color: var(--primary-hover);
+}
+#committees-list .committee-meta {
+  display: block; /* Put meta on new line */
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+#committees-list .committee-subs {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  margin-left: 8px;
+  font-style: italic;
+}

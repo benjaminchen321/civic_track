@@ -1,0 +1,139 @@
+{# FILE: templates/committee_detail.html #}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {# ... head contents ... #}
+    <title>
+      {{ committee.name if committee else 'Committee Detail' }} - CivicTrack
+    </title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='detail.css') }}"
+    />
+  </head>
+  <body>
+    <header class="page-header">
+      {% if committee %}
+      <h1>{{ committee.name }}</h1>
+      {% set display_chamber = chamber_arg | title %} {# Use chamber passed from
+      route #}
+      <span class="sub-header"
+        >{{ display_chamber }} {{ committee.type }} Committee</span
+      >
+      {% else %}
+      <h1>Committee Detail</h1>
+      {% endif %}
+      <nav>
+        <a href="{{ url_for('committees_page') }}"
+          >« Back to Browse Committees</a
+        >
+        |
+        <a href="{{ url_for('index') }}">Member Search</a>
+        {# --- CORRECTED: Construct general congress.gov link --- #} {% if
+        committee and committee.systemCode and chamber_arg %} {% set
+        cg_chamber_path_part = '' %} {% if chamber_arg == 'joint' %} {% set
+        cg_chamber_path_part = 'joint-committee' %} {% elif chamber_arg in
+        ['house', 'senate'] %} {% set cg_chamber_path_part = chamber_arg +
+        '-committee' %} {% endif %} {% if cg_chamber_path_part %} |
+        <a
+          href="https://www.congress.gov/committee/{{ cg_chamber_path_part }}/{{ committee.systemCode }}"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View this committee on Congress.gov"
+          >View on Congress.gov</a
+        >
+        {% endif %} {% endif %} {# --- END CORRECTED LINK --- #}
+      </nav>
+    </header>
+
+    {% if error %}
+    <div class="container error-container">
+      <h2>Error Loading Committee</h2>
+      <p class="error-message visible">{{ error }}</p>
+    </div>
+    {% elif committee %}
+    <div class="container committee-detail-container">
+      <section class="committee-main-info">
+        {% if committee.history and committee.history|length > 0 %}
+        <div class="detail-item">
+          <h4>Committee History (Past Names)</h4>
+          <ul class="history-list">
+            {% for item in committee.history | sort(attribute='startDate',
+            reverse=true) %}
+            <li>
+              <strong
+                >{{ item.officialName or item.libraryOfCongressName }}</strong
+              >
+              ({{ item.startDate.split('T')[0] if item.startDate else '?' }} -
+              {{ item.endDate.split('T')[0] if item.endDate else 'Present' }})
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="committee-sub-items">
+        <div class="detail-item">
+          <h4>Subcommittees</h4>
+          {% if committee.subcommittees and committee.subcommittees|length > 0
+          %}
+          <ul class="subcommittee-list">
+            {% for sub in committee.subcommittees %}
+            <li>
+              {# Link to internal detail page for subcommittees #}
+              <a
+                href="{{ url_for('committee_detail_page', chamber=chamber_arg, committee_code=sub.systemCode) }}"
+                title="View details for {{ sub.name }}"
+                >{{ sub.name }}</a
+              >
+              ({{ sub.systemCode }})
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p>No subcommittees listed.</p>
+          {% endif %}
+        </div>
+
+        {# --- CORRECTED: Display Counts Only --- #} {# Display counts for
+        associated items, but NO direct links to listings #} {% if
+        committee.bills %}
+        <div class="detail-item associated-count">
+          Associated Bills:
+          <strong>{{ committee.bills.count | default(0) }}</strong>
+        </div>
+        {% endif %} {% if committee.reports %}
+        <div class="detail-item associated-count">
+          Committee Reports:
+          <strong>{{ committee.reports.count | default(0) }}</strong>
+        </div>
+        {% endif %} {% if committee.communications %}
+        <div class="detail-item associated-count">
+          Communications:
+          <strong>{{ committee.communications.count | default(0) }}</strong>
+        </div>
+        {% endif %} {# Nominations only apply to Senate/Joint #} {% if
+        committee.nominations and chamber_arg != 'house' %}
+        <div class="detail-item associated-count">
+          Nominations:
+          <strong>{{ committee.nominations.count | default(0) }}</strong>
+        </div>
+        {% endif %} {# --- End Corrected Counts --- #}
+      </section>
+    </div>
+    {% else %}
+    <div class="container">
+      <h2>Committee Not Found</h2>
+      <p>
+        The requested committee could not be found or there was an error loading
+        its data.
+      </p>
+    </div>
+    {% endif %}
+  </body>
+</html>

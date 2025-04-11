@@ -1,0 +1,75 @@
+<!-- FILE: templates/browse_committees.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Committees - CivicTrack</title>
+    <link rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet"
+        href="{{ url_for('static', filename='browse.css') }}">
+</head>
+{# Add data attribute to body tag #}
+
+<body data-initial-congress="{{ current_congress | default('', true) }}">
+    <header class="page-header">
+        <h1>Browse Committees</h1>
+        <nav><a href="{{ url_for('index') }}">« Back to Member Search</a></nav>
+    </header>
+
+    <div id="browse-controls">
+        <!-- ... filters remain the same ... -->
+        <div class="browse-filter-group">
+            <label for="browse-congress-filter">Congress:</label>
+            <select id="browse-congress-filter">
+                <option value="">All Congresses</option>
+                {% for c in congresses %}
+                {# Use comparison for selected attribute #}
+                <option value="{{ c.number }}" {% if c.number==current_congress
+                    %}selected{% endif %}>
+                    {{ c.number }} ({{ c.startYear or '?' }}-{{ c.endYear or
+                    'Present' }})
+                </option>
+                {% else %}
+                <option value="">Error Loading Congresses</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="browse-filter-group">
+            <label for="browse-chamber-filter">Chamber:</label>
+            <select id="browse-chamber-filter">
+                {% for ch in chambers %}
+                <option value="{{ ch.code }}">{{ ch.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button id="apply-filters-btn">Load Committees</button>
+    </div>
+
+    <div id="committees-list-container">
+        <!-- Added span for dynamic context in the title -->
+        <h2>Results <span id="results-title-suffix"></span></h2>
+        <div id="committees-list-status" aria-live="polite">
+            <div class="loader"></div>
+            <p class="error-message"></p>
+            <!-- Placeholder for error messages -->
+        </div>
+        <ul id="committees-list">
+            <!-- Initial instruction message -->
+            <li>Select filters and click "Load Committees".</li>
+        </ul>
+        <!-- Hide pagination controls initially using CSS or inline style -->
+        <div id="pagination-controls" style="display: none;">
+            <button id="prev-page-btn" disabled>« Previous</button>
+            <span id="page-info">Page 1</span>
+            <button id="next-page-btn" disabled>Next »</button>
+        </div>
+    </div>
+
+    <script
+        src="{{ url_for('static', filename='browse_committees.js') }}"></script>
+</body>
+
+</html>
