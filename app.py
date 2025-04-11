@@ -100,6 +100,88 @@ def _make_api_request(endpoint, params=None, timeout=15):
         return None, error_msg
 
 
+# --- Helper to fetch and process sub-resource lists ---
+def _fetch_sub_resource(
+    base_item, resource_key, api_path_segment_base, limit=20
+):  # Default limit to 20 for lists
+    """Fetches a limited list from a sub-resource URL found in a base item."""
+    resource_info = base_item.get(resource_key, {})
+    if not isinstance(resource_info, dict) or not resource_info.get("url"):
+        return None  # No URL info
+
+    count = resource_info.get("count", 0)
+    api_url = resource_info.get("url")
+
+    if count == 0:
+        return []  # Return empty list if count is zero
+
+    try:
+        parsed_url = urlparse(api_url)
+        endpoint = parsed_url.path
+        # Validate endpoint starts with expected base (e.g., /committee/, /bill/, /nomination/)
+        if not endpoint.startswith(f"/{api_path_segment_base}/"):
+            print(
+                f"Warn: Sub-resource URL {api_url} doesn't match expected base /{api_path_segment_base}/ for key '{resource_key}'"
+            )
+            # Might still be a valid different endpoint (like /report list), proceed cautiously
+            # Or return None if strict matching is required? Let's proceed for now.
+            # return None
+
+        # Fetch limited data
+        data, error = _make_api_request(endpoint, params={"limit": limit})
+        if error:
+            print(
+                f"Warn: Failed to fetch sub-resource {resource_key} from {endpoint}: {error}"
+            )
+            return None  # Signal error
+
+        # The actual list might be nested under a different key in the response
+        # E.g., committee/.../reports endpoint returns {"reports": [...]}
+        # We need to find the list within the response data
+        list_key = None
+        if isinstance(data, dict):
+            # Common patterns: plural of resource_key, or the key itself if singular in response
+            possible_keys = [
+                resource_key,
+                resource_key.rstrip("s") + "s",
+                resource_key.replace("s", ""),
+            ]  # try plural, simple plural, remove s
+            # Add specific known keys if needed
+            if resource_key == "reports":
+                possible_keys.append("reports")
+            elif resource_key == "bills":
+                possible_keys.append("bills")
+            elif resource_key == "nominations":
+                possible_keys.append("nominations")
+            elif resource_key == "communications":
+                possible_keys.append(
+                    "communications"
+                )  # Assuming 'communications' key if fetching those
+
+            for key in possible_keys:
+                if isinstance(data.get(key), list):
+                    list_key = key
+                    break
+
+        if list_key and data.get(list_key):
+            # print(f"Debug: Successfully fetched {len(data[list_key])} items for {resource_key} (using key '{list_key}')")
+            return data[list_key]  # Return the list of items
+        else:
+            # If list isn't found directly, check common variations like 'committee-reports' etc.
+            # This part needs refinement based on actual API responses for each sub-resource.
+            # For now, log a warning if the primary key isn't found.
+            print(
+                f"Warn: Could not find list key (tried {possible_keys}) in response for {resource_key} from {endpoint}. Data: {data}"
+            )
+            return None  # Signal unexpected structure
+
+    except Exception as e:
+        print(
+            f"Error parsing or fetching sub-resource {resource_key} URL {api_url}: {e}"
+        )
+        return None
+
+
 # --- Bill/Amendment Detail Fetching ---
 # get_bill_details: Keep existing (used for lists)
 # get_amendment_details: Keep existing (used for lists)
@@ -108,11 +190,11 @@ def _make_api_request(endpoint, params=None, timeout=15):
 # --- NEW: Function for Full Bill Data ---
 @cache.memoize(timeout=7200)  # Cache full details for 2 hours
 def get_full_bill_data(congress, bill_type, bill_number):
-    """Fetches more comprehensive data for the bill detail page."""
+    """Fetches comprehensive data for the bill detail page including related items."""
     print(f"Fetching FULL details for Bill: {congress}-{bill_type}-{bill_number}")
     bill_type_lower = bill_type.lower()
     if bill_type_lower not in BILL_TYPES:
-        return {"error": f"Invalid bill type: {bill_type}", "bill": None}
+        return {"bill": None, "error": f"Invalid bill type: {bill_type}"}
 
     base_endpoint = f"/bill/{congress}/{bill_type_lower}/{bill_number}"
     full_data = {
@@ -120,12 +202,13 @@ def get_full_bill_data(congress, bill_type, bill_number):
         "actions": None,
         "cosponsors": None,
         "committees": None,
-        "summaries": None,
         "relatedBills": None,
+        "amendments": None,
+        "summaries": None,
         "error": None,
     }
 
-    # 1. Get Base Bill Info (contains links to sub-resources)
+    # 1. Get Base Bill Info
     base_data, error = _make_api_request(base_endpoint)
     if error or not base_data or "bill" not in base_data:
         full_data["error"] = error or "Bill base data not found or invalid format."
@@ -134,48 +217,101 @@ def get_full_bill_data(congress, bill_type, bill_number):
         )
         return full_data
 
-    full_data["bill"] = base_data["bill"]  # Store the main bill object
+    bill = base_data["bill"]  # The main bill object
+    full_data["bill"] = bill
 
-    # --- Optionally Fetch Sub-Resources (Example for Actions & Cosponsors) ---
-    # For performance, only fetch if needed, or fetch limited amounts initially.
-    # We'll fetch a small number here as an example.
+    # --- Fetch Sub-Resources using Helper ---
+    fetch_limit = 50  # How many related items to fetch for the page
 
-    # Fetch Actions
-    actions_url = full_data["bill"].get("actions", {}).get("url")
-    if actions_url:
-        actions_endpoint = urlparse(actions_url).path
-        actions_data, actions_error = _make_api_request(
-            actions_endpoint, params={"limit": 50}
-        )  # Get recent actions
-        if actions_error:
-            print(f"Warn: Failed to fetch actions for {base_endpoint}: {actions_error}")
-            # Store error or empty list? Let's store empty for now.
-            full_data["actions"] = []
-        elif actions_data and "actions" in actions_data:
-            full_data["actions"] = actions_data["actions"]
-        else:
-            full_data["actions"] = []  # Store empty list if structure unexpected
+    # Actions (API structure is slightly different, directly in base object usually)
+    # Let's fetch from sub-endpoint for consistency if needed, or use base
+    # Sticking with previous fetch logic for actions for now:
+    actions_list = _fetch_sub_resource(bill, "actions", "bill", limit=fetch_limit)
+    full_data["actions"] = (
+        actions_list if actions_list is not None else []
+    )  # Store list or empty on error/none
 
-    # Fetch Cosponsors
-    cosponsors_url = full_data["bill"].get("cosponsors", {}).get("url")
-    if cosponsors_url:
-        cosponsors_endpoint = urlparse(cosponsors_url).path
-        cosponsors_data, cosponsors_error = _make_api_request(
-            cosponsors_endpoint, params={"limit": 50}
-        )  # Get some cosponsors
-        if cosponsors_error:
-            print(
-                f"Warn: Failed to fetch cosponsors for {base_endpoint}: {cosponsors_error}"
-            )
-            full_data["cosponsors"] = []
-        elif cosponsors_data and "cosponsors" in cosponsors_data:
-            full_data["cosponsors"] = cosponsors_data["cosponsors"]
-        else:
-            full_data["cosponsors"] = []
+    # Cosponsors
+    cosponsors_list = _fetch_sub_resource(bill, "cosponsors", "bill", limit=fetch_limit)
+    if cosponsors_list is not None:
+        linked_cosponsors = []
+        for cs in cosponsors_list:
+            if isinstance(cs, dict) and cs.get("bioguideId"):
+                # Add link to member detail page *conceptually*
+                # Actual rendering happens in template, maybe just pass the ID
+                cs["memberDetailPagePath"] = (
+                    f"/member/{cs['bioguideId']}/details"  # Path for JS fetch
+                )
+            linked_cosponsors.append(cs)
+        full_data["cosponsors"] = linked_cosponsors
+    else:
+        full_data["cosponsors"] = []  # Store empty on error/none
 
-    # TODO: Add similar fetches for committees, summaries, relatedBills, text, titles if needed
+    # Committees
+    committees_list = _fetch_sub_resource(bill, "committees", "bill", limit=fetch_limit)
+    if committees_list is not None:
+        linked_committees = []
+        for comm in committees_list:
+            if isinstance(comm, dict):
+                comm_chamber = comm.get("chamber")
+                comm_code = comm.get("systemCode")
+                if comm_chamber and comm_code:
+                    comm["detailPageUrl"] = (
+                        f"/committee/{comm_chamber.lower()}/{comm_code}"
+                    )
+                linked_committees.append(comm)
+        full_data["committees"] = linked_committees
+    else:
+        full_data["committees"] = []
 
-    # Add congress.gov URL to main bill data for template convenience
+    # Related Bills
+    related_bills_list = _fetch_sub_resource(
+        bill, "relatedBills", "bill", limit=fetch_limit
+    )
+    if related_bills_list is not None:
+        linked_related_bills = []
+        for rb in related_bills_list:
+            if isinstance(rb, dict):
+                rb_cong = rb.get("congress")
+                rb_type = rb.get("type")
+                rb_num = rb.get("number")
+                if rb_cong and rb_type and rb_num:
+                    rb["detailPageUrl"] = f"/bill/{rb_cong}/{rb_type}/{rb_num}"
+                linked_related_bills.append(rb)
+        full_data["relatedBills"] = linked_related_bills
+    else:
+        full_data["relatedBills"] = []
+
+    # Amendments
+    amendments_list = _fetch_sub_resource(bill, "amendments", "bill", limit=fetch_limit)
+    if amendments_list is not None:
+        linked_amendments = []
+        for amdt in amendments_list:
+            if isinstance(amdt, dict):
+                amdt_cong = amdt.get("congress")
+                amdt_type = amdt.get("type")
+                amdt_num = amdt.get("number")
+                if amdt_cong and amdt_type and amdt_num:
+                    # Need an amendment detail page route eventually
+                    # amdt["detailPageUrl"] = f"/amendment/{amdt_cong}/{amdt_type}/{amdt_num}"
+                    # For now, link to congress.gov if possible
+                    path_segment = billTypePaths.get(amdt_type)
+                    if path_segment:
+                        amdt["congressDotGovUrl"] = (
+                            f"https://www.congress.gov/amendment/{amdt_cong}th-congress/{path_segment}/{amdt_num}"
+                        )
+                linked_amendments.append(amdt)
+        full_data["amendments"] = linked_amendments
+    else:
+        full_data["amendments"] = []
+
+    # Summaries (optional)
+    summaries_list = _fetch_sub_resource(
+        bill, "summaries", "bill", limit=1
+    )  # Fetch only latest summary
+    full_data["summaries"] = summaries_list if summaries_list is not None else []
+
+    # Add congress.gov URL to main bill data
     if full_data["bill"]:
         path_segment_key = full_data["bill"].get("type")
         path_segment = billTypePaths.get(path_segment_key)
@@ -291,12 +427,11 @@ def get_amendment_details(congress, amendment_type, amendment_number):
     return details
 
 
-# --- Modified function to IDENTIFY legislation from list item ---
-# (No changes needed from previous version)
+# --- MODIFIED function to IDENTIFY legislation from list item ---
 def _identify_legislation_item(item):
     """
     Helper to IDENTIFY item type, number, congress, and type code from list data.
-    Focuses on identification needed to fetch details later.
+    Focuses on identification needed to fetch details later. Now handles 'amendmentNumber'.
     """
     if not isinstance(item, dict):
         print(f"Warn: Non-dict item in list: {item}")
@@ -304,21 +439,22 @@ def _identify_legislation_item(item):
 
     url = item.get("url")
     congress = item.get("congress")
-    number = item.get("number")  # Bill number or Amendment number depending on context
+    # Get potential numbers from the item dictionary
+    list_number = item.get("number")  # Might be None for amendments
+    list_amendment_number = item.get("amendmentNumber")  # Present for amendments
 
-    if not url or not congress or number is None:
-        # Try to get number from title if missing (e.g. some amendment list items?)
-        # This is less reliable
-        # title = item.get('title', '')
-        # if not number and item.get('amendmentNumber') is not None:
-        #     number = item.get('amendmentNumber')
-
-        # If still missing essential info, log and return None
-        if not url or not congress or number is None:
-            print(
-                f"Warn: Missing essential fields (url, congress, number) in list item: {item}"
-            )
-            return None
+    # --- FIX: Modified initial check ---
+    # Require url, congress, and *at least one* number identifier
+    if (
+        not url
+        or not congress
+        or (list_number is None and list_amendment_number is None)
+    ):
+        print(
+            f"Warn: Missing essential fields (url, congress, and a number identifier) in list item: {item}"
+        )
+        return None
+    # --- End FIX ---
 
     try:
         parsed_url = urlparse(url)
@@ -335,20 +471,24 @@ def _identify_legislation_item(item):
         type_code = path_segments[3].lower()  # e.g., 'hr', 's', 'samdt', 'hamdt'
         url_number_str = path_segments[4]
 
-        # Basic validation
         if not url_number_str.isdigit():
-            print(f"Warn: Non-numeric number in URL path: {url}")
+            print(f"Warn: Non-numeric number in URL path segment: {url}")
             return None
-        url_number = int(url_number_str)
+        url_number = int(url_number_str)  # Trust the number from the URL path
 
-        # Ensure URL number matches list item number if list number exists
-        if number is not None and url_number != number:
-            print(
-                f"Warn: Mismatch between list number ({number}) and URL number ({url_number}) in {url}. Trusting URL."
-            )
-            # Decide whether to trust URL or list item number. Let's trust the URL path structure more.
+        # --- FIX: Removed misleading mismatch warning ---
+        # The logic now consistently uses url_number derived from the path.
+        # The previous check often warned even when numbers matched due to type issues.
+        # if list_number is not None:
+        #     try:
+        #         # Ensure comparison is between integers
+        #         if url_number != int(list_number):
+        #              print(f"Warn: Mismatch between list number ({list_number}) and URL number ({url_number}) in {url}. TRUSTING URL number.")
+        #     except (ValueError, TypeError):
+        #          print(f"Warn: Could not compare list number ({list_number}) with URL number ({url_number}) in {url}. TRUSTING URL number.")
+        # --- End FIX ---
 
-        number_to_use = url_number  # Use number from URL path
+        number_to_use = url_number  # Explicitly use number from URL path
 
         identity = {
             "congress": congress,
@@ -363,6 +503,17 @@ def _identify_legislation_item(item):
         elif item_kind == "amendment" and type_code in AMENDMENT_TYPES:
             identity["item_type"] = "Amendment"
             identity["type"] = type_code.upper()
+            # Sanity check: ensure URL number matches amendmentNumber if present
+            if list_amendment_number is not None:
+                try:
+                    if url_number != int(list_amendment_number):
+                        print(
+                            f"DEBUG: URL number {url_number} differs from list amendmentNumber {list_amendment_number} for {url}"
+                        )
+                        # Stick with URL number as primary identifier derived from path
+                except (ValueError, TypeError):
+                    pass  # Ignore if list_amendment_number isn't an int
+
         else:
             print(
                 f"Warn: Unrecognized item kind '{item_kind}' or type code '{type_code}' in URL: {url}"
@@ -792,13 +943,15 @@ def get_committees_list(congress=None, chamber=None, offset=0, limit=20):
 
 
 @cache.memoize(timeout=7200)  # Cache committee details for 2 hours
+@cache.memoize(timeout=7200)  # Cache committee details for 2 hours
 def get_committee_details(chamber, committee_code):
-    """Fetches detailed information for a specific committee."""
-    print(f"Fetching committee details for: {chamber}/{committee_code}")
-    if chamber not in ["house", "senate", "joint"]:
+    """Fetches detailed information for a specific committee, including associated items."""
+    print(f"Fetching full committee details for: {chamber}/{committee_code}")
+    chamber_lower = chamber.lower()
+    if chamber_lower not in ["house", "senate", "joint"]:
         return {"committee": None, "error": "Invalid chamber specified."}
 
-    endpoint = f"/committee/{chamber.lower()}/{committee_code}"
+    endpoint = f"/committee/{chamber_lower}/{committee_code}"
     data, error = _make_api_request(endpoint)
 
     if error:
@@ -811,13 +964,141 @@ def get_committee_details(chamber, committee_code):
         )
         return {"committee": None, "error": err_msg}
 
-    committee_data = data["committee"]
+    committee = data["committee"]
+    fetch_limit = 15  # Limit for associated items lists
 
-    # Optionally add a direct congress.gov link if derivable
-    # (Requires knowing the base URL structure, which isn't in the API response)
-    # Example: committee_data["congressDotGovUrl"] = f"https://www.congress.gov/committee/{chamber}-committee/{committee_code_maybe_formatted}"
+    # --- Fetch Associated Items using Helper ---
+    associated_bills = _fetch_sub_resource(
+        committee, "bills", "committee", limit=fetch_limit
+    )
+    committee_reports = _fetch_sub_resource(
+        committee, "reports", "committee", limit=fetch_limit
+    )
+    # Nominations only relevant for Senate/Joint
+    associated_nominations = None
+    if chamber_lower != "house":
+        associated_nominations = _fetch_sub_resource(
+            committee, "nominations", "committee", limit=fetch_limit
+        )
+    # Communications (can be house-communication or senate-communication in URL)
+    associated_communications = None
+    comm_key = "communications"  # Key in the base committee object
+    comm_url_info = committee.get(comm_key, {})
+    if isinstance(comm_url_info, dict) and comm_url_info.get("url"):
+        # Determine if it's house or senate comms from the URL itself
+        comm_url = comm_url_info["url"]
+        comm_api_path = urlparse(comm_url).path
+        comm_base_segment = "committee"  # Expected base
+        if "house-communication" in comm_api_path:
+            # Pass 'communications' as resource_key but let helper find list by common patterns
+            associated_communications = _fetch_sub_resource(
+                committee, comm_key, comm_base_segment, limit=fetch_limit
+            )
+        elif "senate-communication" in comm_api_path:
+            associated_communications = _fetch_sub_resource(
+                committee, comm_key, comm_base_segment, limit=fetch_limit
+            )
 
-    return {"committee": committee_data, "error": None}
+    # --- Process Fetched Lists (Add Links) ---
+    processed_bills = []
+    if associated_bills:
+        for bill in associated_bills:
+            if isinstance(bill, dict):
+                b_cong = bill.get("congress")
+                b_type = bill.get("type")
+                b_num = bill.get("number")
+                if b_cong and b_type and b_num:
+                    bill["detailPageUrl"] = f"/bill/{b_cong}/{b_type}/{b_num}"
+                processed_bills.append(bill)
+
+    processed_reports = []
+    if committee_reports:
+        for report in committee_reports:
+            if isinstance(report, dict):
+                # Construct congress.gov link if possible
+                # Example citation: H. Rept. 117-89, Part 1
+                citation = report.get("citation")
+                url = None
+                if citation:
+                    # Attempt to parse congress.gov URL (might be fragile)
+                    try:
+                        parts = citation.replace(".", "").split(
+                            " "
+                        )  # Remove dots, split
+                        if len(parts) >= 3:
+                            # H Rept 117-89
+                            level = parts[0].lower()  # h or s or e ?
+                            rpt_type = parts[1].lower()  # rept
+                            num_part = parts[2].split("-")  # ['117', '89']
+                            if len(num_part) == 2 and rpt_type == "rept":
+                                cong = num_part[0]
+                                num = num_part[1]
+                                # Determine report type code (hrpt, srpt, erpt)
+                                rpt_code = f"{level}{rpt_type}"
+                                if rpt_code in ["hrpt", "srpt", "erpt"]:
+                                    url = f"https://www.congress.gov/committee-report/{cong}th-congress/{rpt_code}/{num}"
+                    except Exception as e:
+                        print(
+                            f"Warn: Could not parse congress.gov URL from report citation '{citation}': {e}"
+                        )
+                report["congressDotGovUrl"] = url  # May be None
+                processed_reports.append(report)
+
+    processed_nominations = []
+    if associated_nominations:
+        for nom in associated_nominations:
+            if isinstance(nom, dict):
+                nom_cong = nom.get("congress")
+                nom_num = nom.get("number")
+                if nom_cong is not None and nom_num is not None:
+                    nom["detailPageUrl"] = f"/nomination/{nom_cong}/{nom_num}"
+                    nom["congressDotGovUrl"] = (
+                        f"https://www.congress.gov/nomination/{nom_cong}th-congress/{nom_num}"  # Direct link
+                    )
+                processed_nominations.append(nom)
+
+    processed_communications = []
+    if associated_communications:
+        for comm in associated_communications:
+            if isinstance(comm, dict):
+                # Construct congress.gov link (structure depends on House/Senate)
+                comm_cong = comm.get("congress")
+                comm_num = comm.get("number")
+                comm_type = comm.get("communicationType", {}).get("code")  # EC, PM etc.
+                comm_chamber = comm.get("chamber")  # House or Senate
+                url = None
+                if comm_cong and comm_num and comm_type and comm_chamber:
+                    chamber_path = "communication"  # Base path? Need to verify congress.gov structure
+                    # It seems congress.gov uses URLs like /congressional-record/volume/issue/house-section/article-number
+                    # Or specific pages per communication number? This is hard to guess reliably.
+                    # Let's just use the API URL for now.
+                    # url = f"https://www.congress.gov/..."
+                    comm["apiUrl"] = comm.get(
+                        "url"
+                    )  # Point back to API URL provided in list
+                processed_communications.append(comm)
+
+    # Add general congress.gov link for the committee itself
+    cg_chamber_path = ""
+    if chamber_lower == "joint":
+        cg_chamber_path = "joint-committee"
+    elif chamber_lower in ["house", "senate"]:
+        cg_chamber_path = f"{chamber_lower}-committee"
+    if cg_chamber_path:
+        committee["congressDotGovUrl"] = (
+            f"https://www.congress.gov/committee/{cg_chamber_path}/{committee_code}"
+        )
+    else:
+        committee["congressDotGovUrl"] = None
+
+    return {
+        "committee": committee,
+        "associated_bills": processed_bills,
+        "committee_reports": processed_reports,
+        "associated_nominations": processed_nominations,
+        "associated_communications": processed_communications,
+        "error": None,
+    }
 
 
 @cache.memoize(timeout=1800)  # Cache nomination lists for 30 mins
@@ -1293,40 +1574,37 @@ def get_bills_list_api():
     )
 
 
-# --- UPDATED: Bill Detail Route ---
+# --- Bill Detail Route (uses get_full_bill_data) ---
 @app.route("/bill/<int:congress>/<bill_type>/<int:bill_number>")
 def bill_detail_page(congress, bill_type, bill_number):
     """Serves the detail page for a specific bill."""
     print(f"Serving detail page for Bill: {congress}-{bill_type}-{bill_number}")
-
-    # Basic validation
     bill_type_lower = bill_type.lower()
     if bill_type_lower not in BILL_TYPES:
         abort(404, description="Invalid bill type provided.")
 
-    # Fetch comprehensive data
-    bill_data = get_full_bill_data(congress, bill_type_lower, bill_number)
+    # Fetch comprehensive data including related lists
+    bill_data_package = get_full_bill_data(congress, bill_type_lower, bill_number)
 
-    if bill_data.get("error"):
-        # Distinguish between 'not found' and other errors
-        err_msg = bill_data["error"]
+    if bill_data_package.get("error"):
+        err_msg = bill_data_package["error"]
         if "not found" in err_msg.lower() or "404" in err_msg:
             abort(
                 404, description=f"Bill {congress}-{bill_type}-{bill_number} not found."
             )
         else:
-            # Render an error page or display error on the detail page?
-            # For now, let's pass the error to the template
+            # Pass error to template
             return render_template(
                 "bill_detail.html",
-                bill_data=None,
+                data=None,
                 error=f"Error fetching bill details: {err_msg}",
             )
 
-    if not bill_data.get("bill"):
+    if not bill_data_package.get("bill"):
         abort(500, description="Failed to retrieve bill data structure.")
 
-    return render_template("bill_detail.html", bill_data=bill_data, error=None)
+    # Pass the whole package to the template
+    return render_template("bill_detail.html", data=bill_data_package, error=None)
 
 
 @app.route("/api/committees")
@@ -1402,33 +1680,29 @@ def committee_detail_page(chamber, committee_code):
     if not committee_code or len(committee_code) < 4:
         abort(404, description="Invalid committee code format.")
 
-    committee_data = get_committee_details(
-        chamber_lower, committee_code
-    )  # Fetches data
+    # Fetch the entire data package including associated lists
+    committee_data_package = get_committee_details(chamber_lower, committee_code)
 
-    if committee_data.get("error"):
-        err_msg = committee_data["error"]
+    if committee_data_package.get("error"):
+        err_msg = committee_data_package["error"]
         if "not found" in err_msg.lower() or "404" in err_msg:
             abort(404, description=f"Committee {chamber}/{committee_code} not found.")
         else:
-            # Pass the known chamber even on error for consistent header rendering maybe?
+            # Pass error and chamber_arg even on error for template consistency
             return render_template(
                 "committee_detail.html",
-                committee=None,
+                data=None,  # No data package on error
                 error=f"Error fetching committee details: {err_msg}",
                 chamber_arg=chamber_lower,
-            )  # Pass chamber arg
+            )
 
-    if not committee_data.get("committee"):
-        abort(500, description="Failed to retrieve committee data structure.")
-
-    # --- Pass committee data AND the chamber argument to the template ---
+    # --- FIX: Pass the entire 'committee_data_package' as 'data' ---
     return render_template(
         "committee_detail.html",
-        committee=committee_data["committee"],
+        data=committee_data_package,  # Pass the whole dict
         error=None,
         chamber_arg=chamber_lower,
-    )  # Pass the validated lower-case chamber
+    )  # Still pass chamber_arg
 
 
 @app.route("/nominations")

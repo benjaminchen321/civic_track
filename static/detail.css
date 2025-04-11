@@ -94,15 +94,6 @@
   background-color: #fdfdfd;
 }
 
-.bill-details-grid {
-  display: grid;
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(300px, 1fr)
-  ); /* Responsive columns */
-  gap: 25px;
-}
-
 /* Nomination Detail Specific */
 .nomination-detail-container {
   max-width: 1000px;
@@ -180,7 +171,9 @@
   line-height: 1.6;
 }
 
+.bill-details-grid,
 .nomination-details-grid {
+  /* Apply grid to both */
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 25px;
@@ -195,24 +188,20 @@
   margin-bottom: 10px;
 }
 
-.detail-item ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  font-size: 0.9rem;
-  max-height: 250px; /* Limit height of lists */
-  overflow-y: auto;
-}
 .detail-item li {
-  padding: 5px 0;
+  padding: 6px 0; /* Adjust padding */
   border-bottom: 1px dashed var(--background-light);
 }
 .detail-item li:last-child {
   border-bottom: none;
 }
-.detail-item p {
-  font-size: 0.9rem;
-  margin-top: 5px;
+
+/* Links to congress.gov */
+.detail-item li > a[target="_blank"],
+.detail-item p > a[target="_blank"] {
+  font-size: 0.85em;
+  font-style: italic;
+  margin-left: 5px;
 }
 .detail-item a {
   color: var(--primary-color);
@@ -239,6 +228,37 @@
   font-weight: 500;
 }
 
+.cosponsor-list a.member-link-internal:hover {
+  text-decoration: underline;
+  color: var(--primary-hover);
+}
+.cosponsor-list li span {
+  /* Styling for dates */
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-left: 5px;
+}
+
+/* Related Bills list */
+.related-list a {
+  font-weight: 500;
+}
+.related-list .relation-type {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-left: 5px;
+  font-style: italic;
+}
+
+/* Amendment list */
+.amendment-list a {
+  font-weight: 500;
+}
+.amendment-list .latest-action-meta {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-left: 5px;
+}
 /* Committee Detail Specific */
 .committee-detail-container {
   /* Similar to bill container */
@@ -347,18 +367,123 @@
   margin-bottom: 10px;
 }
 .detail-item ul {
-  /* Styling for subcommittee list */
   list-style: none;
   padding: 0;
-  margin: 0;
+  margin: 10px 0 0 0; /* Add top margin */
   font-size: 0.9rem;
-  max-height: 250px; /* Limit height of lists */
+  max-height: 300px; /* Slightly taller max height */
   overflow-y: auto;
+  border-top: 1px solid var(--background-control); /* Separator */
+  padding-top: 10px;
 }
+
 .detail-item p {
-  /* Style explanation text */
-  font-size: 0.85em;
+  font-size: 0.9rem;
+  margin-top: 5px;
+} /* For fallback text */
+
+/* Specific styles for committee links within actions */
+.action-list .committee-links {
+  display: block; /* Put committees on new line */
+  font-size: 0.9em;
+  margin-left: 15px; /* Indent */
   color: var(--text-muted);
-  margin-top: 8px;
+  margin-top: 3px;
+}
+.action-list .committee-links a {
+  margin-left: 0;
+  margin-right: 3px;
+}
+.committee-associated-items {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+  /* Use grid layout similar to other detail sections */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 25px;
+}
+
+/* Reuse .detail-item structure */
+.committee-associated-items .detail-item h4 {
+  margin-bottom: 15px; /* More space before list */
+}
+
+/* Generic list styling within detail items */
+.detail-item ul {
+  /* Already styled mostly */
+  max-height: 350px; /* Increase max height slightly */
+}
+.detail-item ul li {
+  margin-bottom: 4px; /* Little space between items */
+}
+
+/* Specific list styling */
+.associated-bills-list .relation-type,
+.associated-nominations-list .latest-action-meta {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-left: 5px;
   font-style: italic;
+}
+
+.committee-reports-list strong,
+.committee-reports-list a {
+  font-weight: 500;
+}
+
+.associated-communications-list strong {
+  font-weight: 500;
+}
+.associated-communications-list a[title="View API Data"] {
+  font-size: 0.8em;
+  margin-left: 5px;
+  text-decoration: none;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+.associated-communications-list a[title="View API Data"]:hover {
+  background-color: var(--background-control);
+  color: var(--text-color);
+}
+
+/* Style "View all..." links */
+.detail-item ul li > a[target="_blank"] {
+  font-size: 0.85em;
+  font-style: italic;
+  color: var(--primary-color);
+  text-decoration: none;
+  margin-left: 5px; /* Consistent margin */
+  display: inline-block; /* Allow margin */
+  margin-top: 5px; /* Space if list item wraps */
+}
+.detail-item ul li > a[target="_blank"]:hover {
+  text-decoration: underline;
+}
+/* Style for the note about missing membership */
+.membership-note {
+  background-color: var(--background-light);
+  padding: 10px 15px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-top: 15px;
+}
+.membership-note h4 {
+  margin-top: 0;
+  margin-bottom: 5px;
+  font-size: 1rem; /* Slightly smaller than other h4 */
+  color: var(--text-muted);
+  border-bottom: none;
+}
+.membership-note p {
+  margin: 0;
+  line-height: 1.5;
+}
+.membership-note a {
+  color: var(--primary-color);
+  font-weight: 500;
 }

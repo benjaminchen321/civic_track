@@ -780,6 +780,37 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // --- NEW: Delegate listener for internal member links ---
+  // Add this listener to the body or a closer static container
+  // This handles clicks on links added dynamically to cosponsor lists etc.
+  document.body.addEventListener("click", (e) => {
+    // Check if the clicked element is an internal member link
+    if (e.target.matches("a.member-link-internal")) {
+      e.preventDefault(); // Prevent default link navigation
+
+      const bioguideId = e.target.dataset.bioguide; // Get ID from data attribute
+      console.log("Internal member link clicked:", bioguideId);
+
+      if (bioguideId) {
+        // --- Option 1: Redirect back to homepage and load member ---
+        // This is simpler if the detail page isn't part of the main SPA structure
+        window.location.href = `/#member=${bioguideId}`;
+
+        // --- Option 2: If detail page was part of a larger SPA structure (more complex) ---
+        // You would need functions to hide the detail view, show the main view,
+        // and then trigger the member load.
+        // hideBillDetailView(); // Hypothetical function
+        // showMainMemberView(); // Hypothetical function
+        // // Ensure member dropdown exists and select the member
+        // if (memberSelect) {
+        //     memberSelect.value = bioguideId;
+        //     // Trigger the change event manually if needed, or directly call fetch
+        //     fetchMemberDetailData(bioguideId);
+        // }
+      }
+    }
+  });
+
   // Filter Listeners (Name, Party, Chamber, State) - No changes needed, they re-populate dropdown
   if (nameSearchInput) {
     let debounceTimeout;
