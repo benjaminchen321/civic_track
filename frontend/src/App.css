@@ -1,0 +1,95 @@
+/* FILE: frontend/src/App.css */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  background-color: #e9ecef;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.logo-title h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #343a40;
+}
+
+.main-nav a {
+  margin: 0 10px;
+  font-weight: 500;
+  color: #0d6efd;
+  text-decoration: none;
+  padding: 5px 0;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.main-nav a:hover,
+.main-nav a.active {
+  /* Add active class handling later using NavLink */
+  border-bottom-color: #0b5ed7;
+}
+
+.app-main-content {
+  flex-grow: 1;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.app-footer {
+  background-color: #e9ecef;
+  padding: 1rem 2rem;
+  text-align: center;
+  font-size: 0.9em;
+  color: #6c757d;
+  border-top: 1px solid #dee2e6;
+  margin-top: auto; /* Push footer to bottom */
+}
+
+/* Optional: Basic Page Header Styling (Can be component later) */
+.page-header-react {
+  border-bottom: 1px solid #dee2e6;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.page-header-react h2 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+.page-header-react nav a {
+  font-size: 0.9rem;
+}
+
+/* Add to shared CSS */
+.back-to-top {
+  position: fixed; /* Stick to viewport */
+  bottom: 20px;
+  right: 20px;
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.9em;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+  z-index: 100; /* Ensure it's above other content */
+}
+
+.back-to-top:hover {
+  opacity: 1;
+}

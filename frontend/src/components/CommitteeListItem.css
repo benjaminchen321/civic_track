@@ -1,0 +1,26 @@
+/* FILE: frontend/src/components/CommitteeListItem.css */
+.committee-list-item-react {
+    padding: 10px 5px;
+    border-bottom: 1px solid #dee2e6; /* Use var(--border-color) */
+    line-height: 1.4;
+}
+.committee-list-item-react:last-child {
+    border-bottom: none;
+}
+.committee-name {
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+.committee-name a {
+    color: #0d6efd; /* Use var(--primary-color) */
+}
+.committee-meta {
+    font-size: 0.9em;
+    color: #6c757d; /* Use var(--text-muted) */
+}
+.committee-subs {
+    font-size: 0.85em;
+    color: #6c757d;
+    margin-left: 0.5rem;
+    font-style: italic;
+}

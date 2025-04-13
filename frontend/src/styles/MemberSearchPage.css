@@ -1,0 +1,313 @@
+/* FILE: frontend/src/styles/MemberSearchPage.css */
+
+.member-search-container {
+  /* Add spacing or layout styles if needed */
+}
+
+/* Reuse .browse-controls-react styles or create new */
+.member-filters-react {
+  background-color: #ffffff;
+  padding: 15px 20px;
+  border-radius: 0.375rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.member-filters-react h4 {
+  display: none;
+} /* Hide placeholder heading */
+
+.filter-group {
+  /* Reuse from BrowsePages.css or define here */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.filter-group label,
+.filter-group .filter-label {
+  font-weight: 600;
+  white-space: nowrap;
+  color: #212529;
+  margin-right: 5px;
+}
+.filter-group select,
+.filter-group input[type="text"] {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  font-size: 0.9rem;
+  background-color: #f8f9fa;
+  min-width: 150px;
+}
+.filter-group select:disabled,
+.filter-group input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background-color: #e9ecef;
+}
+.filter-group input[type="radio"] {
+  margin-right: 3px;
+}
+.filter-group label > input[type="radio"] {
+  vertical-align: middle;
+  margin-top: -2px;
+}
+
+.member-select-react {
+  background-color: #ffffff;
+  padding: 15px 20px;
+  border-radius: 0.375rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.member-select-react label {
+  font-weight: 600;
+}
+.member-select-react select {
+  flex-grow: 1;
+  max-width: 600px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+}
+.member-select-react select:disabled {
+  background-color: #e9ecef;
+  opacity: 0.7;
+}
+
+/* Styles for Member Info Display Area */
+.member-info-react {
+  margin-top: 2rem;
+  background-color: #ffffff; /* var(--background-card); */
+  border: 1px solid #dee2e6; /* var(--border-color); */
+  border-radius: 0.375rem; /* var(--border-radius); */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* var(--box-shadow); */
+  overflow: hidden;
+}
+.member-info-react h3 {
+  /* Optional heading inside the display */
+  padding: 1rem 1.5rem;
+  margin: 0;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  font-size: 1.3rem;
+}
+
+/* Basic Tab Navigation */
+.tab-nav-react {
+  display: flex;
+  border-bottom: 1px solid #dee2e6;
+  padding: 0 1rem;
+  background-color: #f8f9fa; /* var(--background-light) */
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.tab-nav-react button {
+  padding: 0.8rem 1rem;
+  font-size: 0.95rem;
+  border: none;
+  background: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  color: #6c757d; /* var(--text-muted) */
+  margin-bottom: -1px; /* Overlap border */
+  transition: color 0.2s, border-color 0.2s;
+}
+.tab-nav-react button:hover {
+  color: #343a40;
+} /* Darker text */
+.tab-nav-react button.active {
+  color: #0d6efd;
+  border-bottom-color: #0d6efd;
+  font-weight: 600;
+} /* var(--primary-color) */
+
+/* Tab Content */
+.tab-content-react {
+  padding: 1.5rem;
+}
+.tab-content-react h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.5rem;
+}
+.tab-content-react ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Details Tab Specific Layout */
+.member-details-content {
+} /* Container for all details */
+
+.details-top-section {
+  /* Adapting from old CSS */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  align-items: flex-start;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px dashed #eee;
+}
+.member-photo-container {
+  /* Adapting from old CSS */
+  flex-basis: 120px;
+  flex-shrink: 0;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.member-photo-container img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+.member-photo-container span {
+  font-size: 0.8em;
+  color: #6c757d;
+} /* "No Photo" text */
+
+.member-details-grid {
+  /* Adapting from old CSS */
+  flex-grow: 1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5em 1em;
+  align-items: baseline;
+  min-height: 120px;
+}
+.member-details-grid strong {
+  text-align: right;
+  font-weight: 600;
+  color: #495057;
+}
+.member-details-grid span,
+.member-details-grid a {
+  word-break: break-word;
+}
+.member-details-grid a {
+  color: #0d6efd;
+} /* var(--primary-color) */
+
+.details-history-section {
+  /* Adapting from old CSS */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 30px;
+}
+.history-group h5 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  color: #495057;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+.history-group ul {
+  font-size: 0.9rem;
+}
+.history-group li {
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #f8f9fa;
+}
+.history-group li:last-child {
+  border-bottom: none;
+}
+.history-group li strong {
+  display: block;
+} /* Put bold part on own line */
+.history-group li span {
+  color: #6c757d;
+}
+
+.select-member-prompt {
+  /* Style from previous step */
+  text-align: center;
+  padding: 2rem;
+  font-style: italic;
+  color: #6c757d;
+  background-color: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.initial-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1rem;
+  min-height: 300px; /* Ensure it's visible */
+  text-align: center;
+  color: #6c757d; /* var(--text-muted) */
+}
+.initial-loading-container .loading-spinner {
+  margin-bottom: 1rem;
+  width: 50px; /* Larger spinner */
+  height: 50px;
+  border-width: 6px;
+}
+
+/* Styling for the Load More button container */
+.load-more-container {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+.load-more-container + .spinner-container {
+  /* Spinner after load more button */
+  margin-top: 1rem;
+  padding: 1rem; /* Smaller padding */
+}
+
+.load-more-container button {
+  padding: 0.5rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #fff;
+  background-color: #0d6efd; /* Primary color */
+  border: none;
+  border-radius: 0.375rem; /* var(--border-radius) */
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.load-more-container button:hover:not(:disabled) {
+  background-color: #0b5ed7; /* Primary hover */
+}
+
+.load-more-container button:disabled {
+  background-color: #6c757d; /* Muted color */
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+/* Optional: Add margin to spinner when shown after load more */
+.load-more-container + .spinner-container {
+  margin-top: 1rem;
+}

@@ -1,0 +1,43 @@
+/* FILE: frontend/src/components/BillListItem.css */
+.bill-list-item-react {
+  padding: 12px 5px;
+  border-bottom: 1px solid #dee2e6; /* var(--border-color) */
+  line-height: 1.5;
+}
+.bill-list-item-react:last-child {
+  border-bottom: none;
+}
+
+.bill-item-main {
+  margin-bottom: 4px;
+}
+
+.bill-identifier a,
+.bill-identifier strong {
+  font-weight: 600;
+  color: #0d6efd; /* var(--primary-color) */
+  text-decoration: none;
+  margin-right: 5px;
+}
+.bill-identifier a:hover {
+  text-decoration: underline;
+  color: #0b5ed7; /* var(--primary-hover) */
+}
+.bill-title {
+  font-weight: 500;
+}
+.bill-item-meta {
+  font-size: 0.85em;
+  color: #6c757d; /* var(--text-muted) */
+  margin-bottom: 4px;
+}
+.bill-item-meta .external-link {
+  margin-left: 10px;
+  font-style: italic;
+}
+
+.bill-latest-action {
+  font-size: 0.85em;
+  color: #6c757d; /* var(--text-muted) */
+  padding-left: 10px; /* Indent slightly */
+}
