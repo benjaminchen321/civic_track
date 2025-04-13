@@ -36,88 +36,41 @@ def get_member_details_api(bioguide_id):
 
 @members_bp.route("/<bioguide_id>/sponsored")
 def get_member_sponsored_api(bioguide_id):
-    """API: Fetches paginated sponsored legislation for a member."""
+    """API: Fetches a large batch of sponsored legislation for a member."""
     if not bioguide_id or len(bioguide_id) != 7:
         return (
-            jsonify(
-                {
-                    "error": "Invalid Bioguide ID format.",
-                    "items": [],
-                    "count": 0,
-                    "pagination": None,
-                }
-            ),
+            jsonify({"error": "Invalid Bioguide ID format.", "items": [], "count": 0}),
             400,
         )
 
-    # --- Get pagination params ---
-    limit = request.args.get("limit", default=15, type=int)
-    offset = request.args.get("offset", default=0, type=int)
-    if limit > 50:
-        limit = 50  # Set a reasonable max limit
-    if offset < 0:
-        offset = 0
+    current_app.logger.info(f"API: Fetching sponsored for {bioguide_id} (large batch)")
+    # --- FIX: Call service without limit/offset ---
+    sponsored_data = get_detailed_sponsored_legislation(bioguide_id)
 
-    current_app.logger.info(
-        f"API: Fetching sponsored for {bioguide_id}, Limit={limit}, Offset={offset}"
-    )
-    # --- Pass params to service ---
-    sponsored_data = get_detailed_sponsored_legislation(
-        bioguide_id, limit=limit, offset=offset
-    )
-
-    # Determine status based on service response error
     status = 200
     if sponsored_data.get("error"):
-        status = (
-            500
-            if "API Key" in sponsored_data.get("error", "")
-            else 404 if "404" in sponsored_data.get("error", "") else 500
-        )  # Default to 500 for other errors
-
-    return jsonify(sponsored_data), status
+        status = 500  # ... (error status handling) ...
+    return jsonify(sponsored_data), status  # Returns {items, count, error}
 
 
 @members_bp.route("/<bioguide_id>/cosponsored")
 def get_member_cosponsored_api(bioguide_id):
-    """API: Fetches paginated cosponsored legislation for a member."""
+    """API: Fetches a large batch of cosponsored legislation for a member."""
     if not bioguide_id or len(bioguide_id) != 7:
         return (
-            jsonify(
-                {
-                    "error": "Invalid Bioguide ID format.",
-                    "items": [],
-                    "count": 0,
-                    "pagination": None,
-                }
-            ),
+            jsonify({"error": "Invalid Bioguide ID format.", "items": [], "count": 0}),
             400,
         )
 
-    # --- Get pagination params ---
-    limit = request.args.get("limit", default=15, type=int)
-    offset = request.args.get("offset", default=0, type=int)
-    if limit > 50:
-        limit = 50
-    if offset < 0:
-        offset = 0
-
     current_app.logger.info(
-        f"API: Fetching cosponsored for {bioguide_id}, Limit={limit}, Offset={offset}"
+        f"API: Fetching cosponsored for {bioguide_id} (large batch)"
     )
-    # --- Pass params to service ---
-    cosponsored_data = get_detailed_cosponsored_legislation(
-        bioguide_id, limit=limit, offset=offset
-    )
+    # --- FIX: Call service without limit/offset ---
+    cosponsored_data = get_detailed_cosponsored_legislation(bioguide_id)
 
     status = 200
     if cosponsored_data.get("error"):
-        status = (
-            500
-            if "API Key" in cosponsored_data.get("error", "")
-            else 404 if "404" in cosponsored_data.get("error", "") else 500
-        )
-
+        status = 500  # ... (error status handling) ...
     return jsonify(cosponsored_data), status
 
 

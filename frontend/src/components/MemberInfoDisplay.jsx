@@ -11,25 +11,12 @@ import {
   fetchMemberCommittees,
   fetchMemberVotes,
 } from "../services/api"; // API call functions
-// import "./MemberInfoDisplay.css"; // Assuming basic styles exist for layout
-
-// Helper to parse offset from API's next/prev URLs
-const parseOffsetFromUrl = (url) => {
-  if (!url) return null;
-  try {
-    const fullUrl = url.startsWith("http") ? url : `https://example.com${url}`; // Dummy base if relative
-    const params = new URL(fullUrl).searchParams;
-    const offset = parseInt(params.get("offset"), 10);
-    // console.log(`Parsed offset ${offset} from ${url}`); // Uncomment for debugging
-    return isNaN(offset) ? null : offset;
-  } catch (e) {
-    console.error("Error parsing offset from URL:", url, e);
-    return null;
-  }
-};
+import PaginationFE from "./PaginationFE"; // --- NEW: Import Frontend Pagination ---
 
 // Constant for items per page in lazy loading
 const ITEMS_PER_PAGE = 15;
+// --- NEW: How many items to show per page on FRONTEND ---
+const ITEMS_PER_PAGE_FE = 10;
 
 function MemberInfoDisplay({ bioguideId }) {
   const [activeTab, setActiveTab] = useState("details");
@@ -41,27 +28,26 @@ function MemberInfoDisplay({ bioguideId }) {
     error: null,
   });
 
-  // State for LAZY LOADED Tabs (using standard useState)
+  // --- State for List Tabs (Stores ALL items after fetch) ---
   const [sponsoredState, setSponsoredState] = useState({
-    items: [],
-    pagination: null,
-    currentOffset: 0,
-    hasMore: false,
+    allItems: [],
     totalCount: null,
     loading: false,
     error: null,
     loaded: false,
   });
   const [cosponsoredState, setCosponsoredState] = useState({
-    items: [],
-    pagination: null,
-    currentOffset: 0,
-    hasMore: false,
+    allItems: [],
     totalCount: null,
     loading: false,
     error: null,
     loaded: false,
   });
+  // --- Current page for FRONTEND pagination ---
+  const [sponsoredCurrentPage, setSponsoredCurrentPage] = useState(1);
+  const [cosponsoredCurrentPage, setCosponsoredCurrentPage] = useState(1);
+  // --- End State Changes ---
+
   // Simpler state for non-paginated/unimplemented tabs
   const [committeesState, setCommitteesState] = useState({
     data: null,
@@ -89,25 +75,21 @@ function MemberInfoDisplay({ bioguideId }) {
     // Reset all states completely when bioguideId changes
     setDetailsState({ data: null, loading: true, error: null });
     setSponsoredState({
-      items: [],
-      pagination: null,
-      currentOffset: 0,
-      hasMore: false,
+      allItems: [],
       totalCount: null,
       loading: false,
       error: null,
       loaded: false,
-    }); // Reset paginated state
+    }); // Reset list state
     setCosponsoredState({
-      items: [],
-      pagination: null,
-      currentOffset: 0,
-      hasMore: false,
+      allItems: [],
       totalCount: null,
       loading: false,
       error: null,
       loaded: false,
-    }); // Reset paginated state
+    }); // Reset list state
+    setSponsoredCurrentPage(1); // Reset page number
+    setCosponsoredCurrentPage(1); // Reset page number
     setCommitteesState({
       data: null,
       error: null,
@@ -138,7 +120,6 @@ function MemberInfoDisplay({ bioguideId }) {
         detailsResponse,
         fetchError,
       });
-
       const actualError = fetchError || detailsResponse?.error;
 
       if (actualError) {
@@ -148,7 +129,8 @@ function MemberInfoDisplay({ bioguideId }) {
           loading: false,
           error: `Details Error: ${actualError}`,
         });
-        setSponsoredState((prev) => ({ ...prev, totalCount: 0 })); // Set counts to 0 on error
+        // Set counts to 0 if details fail
+        setSponsoredState((prev) => ({ ...prev, totalCount: 0 }));
         setCosponsoredState((prev) => ({ ...prev, totalCount: 0 }));
       } else if (detailsResponse?.details) {
         const detailsData = detailsResponse.details;
@@ -178,21 +160,15 @@ function MemberInfoDisplay({ bioguideId }) {
     };
 
     loadDetails();
-
-    // Cleanup function
     return () => {
-      console.log("MemberInfoDisplay: Cleanup for ", bioguideId);
       isStillMounted = false;
-    };
-  }, [bioguideId]); // Re-run ONLY when bioguideId changes
+    }; // Cleanup
+  }, [bioguideId]); // Dependency array is correct
 
-  // --- Lazy Load Tab Data ---
-  // useCallback depends only on bioguideId, uses functional state updates
-  const loadTabData = useCallback(
-    async (tabName, offset = 0, append = false) => {
+  // --- Load ALL data for a tab ---
+  const loadAllTabData = useCallback(
+    async (tabName) => {
       if (!bioguideId) return;
-
-      // Map tab name to state getter and setter
       const tabConfigMap = {
         sponsored: {
           stateGetter: () => sponsoredState,
@@ -216,80 +192,57 @@ function MemberInfoDisplay({ bioguideId }) {
         },
       };
       const config = tabConfigMap[tabName];
-      if (!config) return;
-
-      // Check current loading state before fetching
-      if (config.stateGetter().loading) {
-        console.log(`LoadTabData for ${tabName} aborted: already loading.`);
+      if (
+        !config ||
+        config.stateGetter().loading ||
+        config.stateGetter().loaded
+      ) {
+        // Don't reload if already loaded or currently loading
         return;
       }
 
-      console.log(
-        `MemberInfoDisplay: ${
-          append ? "Loading more" : "Loading initial"
-        } ${tabName} (Requesting Offset: ${offset})`
-      );
-      config.setter((prev) => ({ ...prev, loading: true, error: null })); // Set loading true
+      console.log(`MemberInfoDisplay: Loading ALL ${tabName}`);
+      config.setter((prev) => ({ ...prev, loading: true, error: null }));
 
-      const params =
-        tabName === "sponsored" || tabName === "cosponsored"
-          ? { limit: ITEMS_PER_PAGE, offset }
-          : {};
+      // Fetch function now returns { items, count, error } from backend service
       const { data: apiResponse, error: fetchError } = await config.fetchFn(
-        bioguideId,
-        params
-      );
+        bioguideId
+      ); // No limit/offset params needed now
       const responseError = fetchError || apiResponse?.error;
 
-      console.log(
-        `MemberInfoDisplay: API response for ${tabName} (Offset: ${offset}):`,
-        { apiResponse, responseError }
-      );
+      console.log(`MemberInfoDisplay: API response for ALL ${tabName}:`, {
+        apiResponse,
+        responseError,
+      });
 
-      // Use functional update form to guarantee access to latest state
       config.setter((prev) => {
-        console.log(
-          `Setter running for ${tabName}. Append: ${append}. Prev items count: ${prev.items?.length}. Prev Offset: ${prev.currentOffset}`
-        ); // Log previous state
-
         if (responseError) {
-          console.error(`Error in setter for ${tabName}:`, responseError);
+          console.error(`Error loading ALL ${tabName}:`, responseError);
           return {
             ...prev,
             error: `Load Error: ${responseError}`,
             loading: false,
             loaded: true,
-            items: append ? prev.items : [],
-            pagination: prev.pagination,
-            hasMore: append ? prev.hasMore : false,
-          }; // Assume no more on error
+            allItems: [], // Reset items on error
+            totalCount: 0, // Reset count on error
+          };
         } else if (
           (tabName === "sponsored" || tabName === "cosponsored") &&
           apiResponse?.items !== undefined
         ) {
-          const newItems = apiResponse.items || [];
-          const newPagination = apiResponse.pagination || null;
-          const currentTotalCount = prev.totalCount; // Preserve total count
-          // Ensure prev.items is treated as an array before spreading
-          const combinedItems = append
-            ? [...(prev.items || []), ...newItems]
-            : newItems;
-
-          // --- FIX: Rely on API's next link presence for hasMore ---
-          const newHasMore = !!newPagination?.next;
-          // --- End FIX ---
+          const allItems = apiResponse.items || [];
+          // Use count from response if available, otherwise use items length or previous state
+          const finalTotalCount =
+            apiResponse.count ?? prev.totalCount ?? allItems.length;
 
           console.log(
-            `Updating ${tabName}. Fetched: ${newItems.length}. Combined: ${combinedItems.length}. Total: ${currentTotalCount}. HasMore: ${newHasMore}. New Pagination obj:`,
-            newPagination
+            `Updating state for ${tabName}. ALL Items: ${allItems.length}. Total Count: ${finalTotalCount}.`
           );
 
           return {
-            ...prev, // Keep totalCount
-            items: combinedItems,
-            pagination: newPagination, // Store the NEW pagination object
-            currentOffset: offset, // Store the offset actually requested
-            hasMore: newHasMore, // Use flag derived from API pagination
+            ...prev,
+            allItems: allItems, // Store ALL fetched items
+            totalCount: finalTotalCount, // Update total count from this response
             error: null,
             loading: false,
             loaded: true,
@@ -298,7 +251,7 @@ function MemberInfoDisplay({ bioguideId }) {
           (tabName === "committees" || tabName === "votes") &&
           apiResponse
         ) {
-          // Handle simpler state structure for these tabs
+          // Handle non-paginated simple state update
           return {
             ...prev,
             data: apiResponse,
@@ -307,18 +260,14 @@ function MemberInfoDisplay({ bioguideId }) {
             loaded: true,
           };
         } else {
-          // Unexpected structure from API
-          console.error(
-            `Invalid data structure in setter for ${tabName}:`,
-            apiResponse
-          );
+          // Unexpected list structure
+          console.error(`Invalid data structure for ${tabName}:`, apiResponse);
           return {
             ...prev,
             error: `Invalid data structure for ${tabName}`,
             loading: false,
             loaded: true,
-            items: append ? prev.items : [],
-            hasMore: false,
+            allItems: [],
           };
         }
       });
@@ -329,7 +278,7 @@ function MemberInfoDisplay({ bioguideId }) {
   // --- Event Handlers ---
   const handleTabClick = (tabName) => {
     setActiveTab(tabName);
-    // Use current state value to check if initial load is needed
+    // Use current state value to check if initial load needed
     const configMap = {
       sponsored: sponsoredState,
       cosponsored: cosponsoredState,
@@ -337,65 +286,42 @@ function MemberInfoDisplay({ bioguideId }) {
       votes: votesState,
     };
     const currentState = configMap[tabName];
-    if (currentState && !currentState.loaded && !currentState.loading) {
-      loadTabData(tabName, 0, false); // Trigger initial load for the tab
+
+    if (tabName === "sponsored" || tabName === "cosponsored") {
+      // Trigger load only if not already loaded or currently loading
+      if (currentState && !currentState.loaded && !currentState.isLoading) {
+        console.log(`Switching to ${tabName}, triggering load.`);
+        // Reset current page to 1 for the specific tab
+        if (tabName === "sponsored") setSponsoredCurrentPage(1);
+        else if (tabName === "cosponsored") setCosponsoredCurrentPage(1);
+        loadAllTabData(tabName); // Load all data for this tab
+      }
+    } else {
+      // Handle non-list tabs as before
+      if (currentState && !currentState.loaded && !currentState.loading) {
+        const setter =
+          tabName === "committees" ? setCommitteesState : setVotesState;
+        const fetchFn =
+          tabName === "committees" ? fetchMemberCommittees : fetchMemberVotes;
+        setter((prev) => ({ ...prev, loading: true }));
+        fetchFn(bioguideId).then(({ data, error }) => {
+          setter({ data, error, loading: false, loaded: true });
+        });
+      }
     }
-    // Scroll tab content to top on switch
+
     if (scrollableContentRef.current)
       scrollableContentRef.current.scrollTop = 0;
   };
 
-  const handleLoadMore = (tabName) => {
-    // Read current state directly when handler runs
-    const currentState =
-      tabName === "sponsored" ? sponsoredState : cosponsoredState;
-    // --- FIX: Use pagination ref from state, check loading ---
-    const currentPagination = currentState.pagination;
-    const nextUrl = currentPagination?.next;
+  // --- FIX: Remove handleLoadMore ---
 
-    console.log(
-      `Load More clicked for ${tabName}. Current State Pagination:`,
-      currentPagination
-    );
-
-    if (!nextUrl || currentState.loading) {
-      // Check if next URL exists and not already loading
-      console.log(
-        `Load More condition failed: NextURL=${nextUrl}, Loading=${currentState?.loading}`
-      );
-      return;
-    }
-    const nextOffset = parseOffsetFromUrl(nextUrl); // Parse offset from the *correct* next URL
-    console.log(`Attempting to load next offset: ${nextOffset}`);
-    if (nextOffset !== null) {
-      loadTabData(tabName, nextOffset, true); // Load next, APPEND data
-    } else {
-      console.warn(
-        `Could not parse next offset for ${tabName} from URL:`,
-        nextUrl
-      );
-      // Set error on the relevant state slice
-      const configMap = {
-        sponsored: setSponsoredState,
-        cosponsored: setCosponsoredState,
-      };
-      const setter = configMap[tabName];
-      if (setter) {
-        setter((prev) => ({
-          ...prev,
-          error: "Failed to determine next page offset.",
-        }));
-      }
-    }
-  };
-
+  // --- Scroll Logic & Back to Top ---
   const scrollToTop = () => {
     if (scrollableContentRef.current) {
       scrollableContentRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
-
-  // --- Scroll Listener for Back to Top ---
   useEffect(() => {
     const scrollableElement = scrollableContentRef.current;
     if (!scrollableElement) return;
@@ -414,61 +340,76 @@ function MemberInfoDisplay({ bioguideId }) {
       if (scrollableElement)
         scrollableElement.removeEventListener("scroll", handleScroll);
     };
-  }, [activeTab]); // Re-attach listener if scroll container changes per tab
+  }, [activeTab]); // Dependency okay
 
-  // --- Helper Render Legislation List ---
-  const renderLegislationList = (stateData, listName) => {
-    // stateData is { items, pagination, currentOffset, hasMore, totalCount, loading, error, loaded }
-    if (!stateData.loaded && !stateData.loading)
-      return <p className="tab-prompt">Click tab to load.</p>;
-    if (stateData.loading && stateData.items.length === 0)
-      return <LoadingSpinner />;
+  // --- Helper Render Legislation List with Frontend Pagination ---
+  const renderLegislationList = (
+    stateData,
+    listName,
+    currentPage,
+    setCurrentPage
+  ) => {
+    // stateData is sponsoredState or cosponsoredState
+    if (!stateData.loaded && !stateData.isLoading)
+      return <p className="tab-prompt">Loading data...</p>; // Show loading prompt
+    if (stateData.isLoading) return <LoadingSpinner />; // Show spinner while fetching ALL
 
-    const items = stateData.items || [];
-    const hasMore = stateData.hasMore; // Use calculated flag based on pagination.next
-    const isLoadingMore = stateData.loading && items.length > 0;
+    // Use allItems for FE pagination
+    const items = stateData.allItems || [];
+    const totalItems = stateData.totalCount ?? items.length; // Use known total or length
+
+    // --- Frontend Pagination Logic ---
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE_FE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE_FE;
+    const endIndex = startIndex + ITEMS_PER_PAGE_FE;
+    const itemsToShow = items.slice(startIndex, endIndex);
+    // --- End FE Pagination Logic ---
 
     return (
       <>
         {stateData.error && <ErrorMessage message={stateData.error} />}
         {items.length > 0 ? (
-          <ul className="results-list-react bill-list">
-            {items.map((item, index) => (
-              <BillListItem
-                key={`${item.congress}-${item.type}-${item.number}-${index}`}
-                bill={item}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className="results-list-react bill-list">
+              {itemsToShow.map((item, index) => (
+                <BillListItem
+                  key={`${item.congress}-${item.type}-${item.number}-${
+                    startIndex + index
+                  }`}
+                  bill={item}
+                />
+              ))}
+            </ul>
+            {/* --- Add Frontend Pagination Component --- */}
+            <PaginationFE
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                // Scroll to top of list when changing page
+                if (scrollableContentRef.current)
+                  scrollableContentRef.current.scrollTop = 0;
+              }}
+            />
+          </>
         ) : (
           stateData.loaded &&
-          !stateData.loading &&
+          !stateData.isLoading &&
           !stateData.error && <p>No {listName} items found.</p>
         )}
-        {/* Load More Button - Render based on calculated hasMore flag */}
-        {hasMore && (
-          <div className="load-more-container">
-            <button
-              onClick={() => handleLoadMore(listName)}
-              disabled={isLoadingMore}
-            >
-              {isLoadingMore ? "Loading..." : "Load More"}
-            </button>
-          </div>
-        )}
-        {isLoadingMore && <LoadingSpinner />}
+        {/* Remove Load More Button */}
       </>
     );
   };
 
   // --- Helper Render Details Tab ---
   const renderDetailsTab = () => {
-    // console.log("Render Details Tab - State:", detailsState);
     if (detailsState.loading) return <LoadingSpinner />;
     if (detailsState.error)
       return <ErrorMessage message={detailsState.error} />;
-    if (!detailsState.data) return <p>No details available to display.</p>;
+    if (!detailsState.data) return <p>No details available.</p>;
     const detailsData = detailsState.data;
+    // Keep the full JSX structure for rendering details here
     return (
       <div className="member-details-content">
         <h4>Member Details</h4>
@@ -616,11 +557,11 @@ function MemberInfoDisplay({ bioguideId }) {
   };
 
   // --- Main Render ---
-  // Read counts from the respective state objects for display
+  // Get counts from details state for initial display
   const displaySponsoredCount =
-    sponsoredState.totalCount !== null ? sponsoredState.totalCount : "?";
+    detailsState.data?.sponsoredLegislation?.count ?? "?";
   const displayCosponsoredCount =
-    cosponsoredState.totalCount !== null ? cosponsoredState.totalCount : "?";
+    detailsState.data?.cosponsoredLegislation?.count ?? "?";
 
   return (
     <div className="member-info-react">
@@ -668,19 +609,29 @@ function MemberInfoDisplay({ bioguideId }) {
         <div className={`tab-pane ${activeTab === "details" ? "active" : ""}`}>
           {activeTab === "details" && renderDetailsTab()}
         </div>
-        {/* Sponsored Tab - Use State directly */}
+        {/* Sponsored Tab */}
         <div
           className={`tab-pane ${activeTab === "sponsored" ? "active" : ""}`}
         >
           {activeTab === "sponsored" &&
-            renderLegislationList(sponsoredState, "sponsored")}
+            renderLegislationList(
+              sponsoredState,
+              "sponsored",
+              sponsoredCurrentPage,
+              setSponsoredCurrentPage
+            )}
         </div>
-        {/* Cosponsored Tab - Use State directly */}
+        {/* Cosponsored Tab */}
         <div
           className={`tab-pane ${activeTab === "cosponsored" ? "active" : ""}`}
         >
           {activeTab === "cosponsored" &&
-            renderLegislationList(cosponsoredState, "cosponsored")}
+            renderLegislationList(
+              cosponsoredState,
+              "cosponsored",
+              cosponsoredCurrentPage,
+              setCosponsoredCurrentPage
+            )}
         </div>
         {/* Committees Tab */}
         <div

@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 from . import cache
 from .utils import _make_api_request
 
+FETCH_ALL_LIMIT = 250
+
 
 # --- Helper to fetch sub-resources ---
 def _fetch_sub_resource(base_item, resource_key, api_path_segment_base, limit=20):
@@ -352,28 +354,22 @@ def _identify_legislation_item(item):
 
 
 # --- Sponsored/Cosponsored ---
-@cache.memoize()  # Cache based on args: bioguide_id, limit, offset
-def get_detailed_sponsored_legislation(
-    bioguide_id, limit=15, offset=0
-):  # Add limit/offset args
-    """Fetches a paginated list of DETAILED sponsored legislation."""
+@cache.memoize()  # Cache based on bioguide_id ONLY now
+def get_detailed_sponsored_legislation(bioguide_id):
+    """Fetches a large batch of DETAILED sponsored legislation."""
     current_app.logger.info(
-        f"Fetching sponsored: ID={bioguide_id}, Limit={limit}, Offset={offset}"
+        f"Fetching up to {FETCH_ALL_LIMIT} sponsored items for {bioguide_id}"
     )
     endpoint = f"/member/{bioguide_id}/sponsored-legislation"
-    params = {"limit": limit, "offset": offset}  # Use passed args
+    # --- FIX: Use fixed large limit, no offset ---
+    params = {"limit": FETCH_ALL_LIMIT, "offset": 0}
     list_data, error = _make_api_request(endpoint, params=params)
 
-    # Initialize return structure
-    result = {
-        "items": [],
-        "pagination": None,
-        "error": error,
-        "count": 0,
-    }  # Keep count for simplicity, though pagination has it
+    # Initialize return structure - no pagination object needed
+    result = {"items": [], "error": error, "count": 0}
 
     if error:
-        return result  # Return error if list fetch fails
+        return result
 
     if list_data:
         item_list = None
@@ -382,20 +378,21 @@ def get_detailed_sponsored_legislation(
                 item_list = list_data[key]
                 break
 
-        result["pagination"] = list_data.get("pagination")  # Store pagination info
-        if result["pagination"]:
-            result["count"] = result["pagination"].get(
-                "count", 0
-            )  # Get count from pagination
+        # Get total count from pagination, even if we don't return pagination itself
+        pagination_info = list_data.get("pagination")
+        if pagination_info:
+            result["count"] = pagination_info.get("count", 0)
+        elif item_list:  # Fallback count
+            result["count"] = len(item_list)
 
         if item_list:
-            # current_app.logger.debug(f"Processing {len(item_list)} sponsored items for details...")
             processed_items = []
-            for item in item_list:
+            for item in item_list:  # Process the fetched batch
                 identity = _identify_legislation_item(item)
                 if not identity:
                     continue
                 details = None
+                # Fetch basic details for each item in the batch
                 if identity["item_type"] == "Bill":
                     details = get_bill_details(
                         identity["congress"], identity["type"], identity["number"]
@@ -408,38 +405,29 @@ def get_detailed_sponsored_legislation(
                 if details and not details.get("error"):
                     details["item_type"] = identity["item_type"]
                     processed_items.append(details)
-                # else: # Log errors if needed, but maybe too verbose
-                #    err_msg = details.get('error') if details else 'Fetch error'
-                #    current_app.logger.warning(f"Failed details fetch in sponsored list: {identity} - {err_msg}")
+                # else: Log errors if needed
 
             result["items"] = processed_items
         else:
-            current_app.logger.warning(
-                f"No item list key found in sponsored response for {bioguide_id}"
-            )
-            result["error"] = (
-                "Invalid API response structure (sponsored list)."  # Add error if list key missing
-            )
-
+            result["error"] = "Invalid API response structure (sponsored list)."
     else:
         result["error"] = "No data received from sponsored legislation API."
 
     return result
 
 
-@cache.memoize()  # Cache based on args
-def get_detailed_cosponsored_legislation(
-    bioguide_id, limit=15, offset=0
-):  # Add limit/offset args
-    """Fetches a paginated list of DETAILED cosponsored legislation."""
+@cache.memoize()  # Cache based on bioguide_id
+def get_detailed_cosponsored_legislation(bioguide_id):
+    """Fetches a large batch of DETAILED cosponsored legislation."""
     current_app.logger.info(
-        f"Fetching cosponsored: ID={bioguide_id}, Limit={limit}, Offset={offset}"
+        f"Fetching up to {FETCH_ALL_LIMIT} cosponsored items for {bioguide_id}"
     )
     endpoint = f"/member/{bioguide_id}/cosponsored-legislation"
-    params = {"limit": limit, "offset": offset}
+    # --- FIX: Use fixed large limit, no offset ---
+    params = {"limit": FETCH_ALL_LIMIT, "offset": 0}
     list_data, error = _make_api_request(endpoint, params=params)
 
-    result = {"items": [], "pagination": None, "error": error, "count": 0}
+    result = {"items": [], "error": error, "count": 0}
 
     if error:
         return result
@@ -451,14 +439,15 @@ def get_detailed_cosponsored_legislation(
                 item_list = list_data[key]
                 break
 
-        result["pagination"] = list_data.get("pagination")
-        if result["pagination"]:
-            result["count"] = result["pagination"].get("count", 0)
+        pagination_info = list_data.get("pagination")
+        if pagination_info:
+            result["count"] = pagination_info.get("count", 0)
+        elif item_list:
+            result["count"] = len(item_list)
 
         if item_list:
-            # current_app.logger.debug(f"Processing {len(item_list)} cosponsored items for details...")
             processed_items = []
-            for item in item_list:
+            for item in item_list:  # Process the fetched batch
                 identity = _identify_legislation_item(item)
                 if not identity:
                     continue
@@ -471,21 +460,14 @@ def get_detailed_cosponsored_legislation(
                     details = get_amendment_details(
                         identity["congress"], identity["type"], identity["number"]
                     )
-
                 if details and not details.get("error"):
                     details["item_type"] = identity["item_type"]
                     processed_items.append(details)
-                # else: # Log errors if needed
-                #    err_msg = details.get('error') if details else 'Fetch error'
-                #    current_app.logger.warning(f"Failed details fetch in cosponsored list: {identity} - {err_msg}")
+                # else: Log errors
 
             result["items"] = processed_items
         else:
-            current_app.logger.warning(
-                f"No item list key found in cosponsored response for {bioguide_id}"
-            )
             result["error"] = "Invalid API response structure (cosponsored list)."
-
     else:
         result["error"] = "No data received from cosponsored legislation API."
 
